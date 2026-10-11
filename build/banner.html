@@ -2,24 +2,19 @@
 <!--
   Fonte do banner do README (docs/assets/banner.png).
 
-  A capa é a mesma da landing page: paleta de
-  Landing-page/src/app/style/globals.css e formas de
-  Landing-page/src/components/HomeContent.tsx, com o texto centralizado para
-  1280x400. Nada aqui é lógica do app, é só o retrato estático do hero.
+  Capa estática do Guardinha, com texto centralizado para 1280x400.
+  Nada aqui é lógica do app; este HTML é a fonte da imagem versionada em
+  docs/assets/banner.png.
 
   Para regerar: troque ICON_PATH pelo caminho do build/icon.png e capture com
   o Chromium do Electron (BrowserWindow 1280x400, useContentSize, e
-  `webContents.capturePage().toPNG()`). Sem isso o PNG do banner não tem
-  procedência rastreável, e é o único artefato do repositório que não sai de
-  nenhum código.
+  `webContents.capturePage().toPNG()`).
 -->
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
     <style>
-      /* Paleta e formas de Landing-page/src/app/style/globals.css e
-         HomeContent.tsx (capa do hero). ViewBox 1280x400 = 1:1 com o
-         banner, então as formas caem no tamanho do site sem escala. */
+      /* Viewport 1280x400, igual ao tamanho final do banner. */
       :root {
         --bg: #020617;
         --surface: #0f172a;

@@ -29,13 +29,13 @@ Todo texto vem do contexto de idioma (`useMessages()`), nunca embutido no JSX.
 
 ## Abas da Sidebar
 
-| Aba               | Componente      | Conteúdo                                              |
-| ----------------- | --------------- | ----------------------------------------------------- |
-| Início (Senhas)   | `Home`          | Busca, contagem, lista e botão de nova credencial     |
-| Gerador de Senhas | `Generator`     | Slider de comprimento, três chaves e entropia pessoal |
-| Verificador 2FA   | `Authenticator` | Lista de tokens com código, contagem e cópia          |
-| Atribuições       | `Credits`       | Créditos em rolagem, com pausa no hover               |
-| Configurações     | `Settings`      | PIN de pânico e autodestruição por tentativas         |
+| Aba               | Componente      | Conteúdo                                                    |
+| ----------------- | --------------- | ----------------------------------------------------------- |
+| Início (Senhas)   | `Home`          | Busca, contagem, lista e botão de nova credencial           |
+| Gerador de Senhas | `Generator`     | Slider de comprimento, quatro categorias e entropia pessoal |
+| Verificador 2FA   | `Authenticator` | Lista de tokens com código, contagem e cópia                |
+| Atribuições       | `Credits`       | Créditos em rolagem, com pausa no hover                     |
+| Configurações     | `Settings`      | PIN de pânico e autodestruição por tentativas               |
 
 O rodapé da Sidebar mostra que os dados estão locais. O botão de bloqueio chama
 `vault.lock()` e volta para a aba Início.
@@ -118,7 +118,9 @@ O botão de adicionar abre o `AuthTokenModal`, que aceita duas entradas para o
 mesmo segredo: o endereço `otpauth://` que o serviço mostra quando o usuário
 escolhe "não posso escanear agora", com prévia do que ele resolve antes de
 salvar; ou a chave Base32 digitada à mão, com emissor, conta, algoritmo,
-dígitos e período. Editar abre direto na segunda aba, com os campos preenchidos.
+dígitos e período. Editar abre direto na segunda aba, com os metadados
+preenchidos. O campo do segredo começa vazio, pois a chave nunca é devolvida ao
+renderer; para salvar uma edição, é necessário digitá-la novamente.
 
 Excluir pede confirmação dentro da própria tela. Detalhes do formato e do
 armazenamento em `docs/autenticador.md`.

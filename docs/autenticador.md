@@ -78,6 +78,10 @@ do app (DOM, scripts da página, `guardinha://`). Um segredo TOTP em memória al
 é uma senha de servidor esperando ser lida. `AuthToken` não tem o campo
 `secret` justamente para o tipo impedir o descuido.
 
+Como consequência, ao editar um token os metadados são preenchidos, mas o
+segredo permanece em branco. Para salvar a edição pela interface atual, o
+usuário precisa informar novamente a chave Base32.
+
 ## Armazenamento
 
 Os tokens ficam em `/var/lib/.guardinha/.vault/.auth/<uuid>.zka`, um arquivo
@@ -99,14 +103,16 @@ token entra na mesma varredura que a credencial.
 O manifesto cifrado do cofre passou da versão 1 para a versão 2 e agora lista as
 duas coisas: `ids` (credenciais) e `authIds` (tokens).
 
-Um cofre gravado na v1 é lido sem o campo novo (a pasta `.auth` simplesmente
-nasce vazia) e volta selado na v2 na próxima escrita, **sem migração e sem
-mudança no formato do container**: o blob continua sendo um AES-256-GCM opaco.
+O código atual exige `v: 2`, com `ids` e `authIds`; não há compatibilidade com
+manifestos v1. Além disso, o container aceita somente a versão 5. Um arquivo de
+container antigo é recusado como formato incompatível antes de o manifesto ser
+aberto. O campo `v` fica dentro do blob AES-256-GCM e não altera o cabeçalho do
+container.
 
 O motivo de cobrir os tokens: sem isso, apagar um `.zka` ou plantar o seu
 próprio passaria despercebido. O segredo TOTP trocado em silêncio é exatamente
-o ataque que o manifesto existe para fechar, e `tests/main/authenticator.test.ts`
-tem o caso plantado.
+o ataque que o manifesto existe para fechar; esse comportamento é testado em
+`tests/main/authenticator.test.ts`.
 
 ## Autodestruição
 

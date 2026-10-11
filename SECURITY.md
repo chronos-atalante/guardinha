@@ -4,6 +4,7 @@
 
 | Versão | Suporte             |
 | ------ | ------------------- |
+| 1.6.x  | ✅ Correções ativas |
 | 1.5.x  | ✅ Correções ativas |
 | 1.4.x  | ✅ Correções ativas |
 | 1.3.x  | ✅ Correções ativas |
@@ -46,7 +47,7 @@ contrário).
   (`panicDestroy`, em `src/main/vault.ts`), que **zera a chave da RAM antes de
   tocar no disco**: se o disco falhar, a memória já está limpa.
 - **Sobrescrita antes do `unlink`**: todo arquivo apagado pelo app (container,
-  `.zke` e temporários) passa por `shredFile` (`src/main/shred.ts`),
+  `.zke`, `.zka` e temporários) passa por `shredFile` (`src/main/shred.ts`),
   que sobrescreve em blocos de 64 KiB alternando bytes aleatórios e zeros,
   termina com a passada de zeros, faz `fsync` antes de fechar (sem isso a
   sobrescrita pode ficar só no cache de página), apaga o nome e sincroniza o
@@ -71,7 +72,7 @@ contrário).
   nascimento, palavra comum e PIN fraco, é orientação no medidor da UI e não
   barra a criação.
 - **Chave sempre protegida**: as chaves passam por Argon2id com custo por
-  credencial, sendo **PIN de 8 dígitos com 256 MB, t=4, p=4** (é o segredo
+  método de desbloqueio, sendo **PIN de 8 dígitos com 256 MB, t=4, p=4** (é o segredo
   fraco, com 10^8 candidatas, então o mais caro) e **senha mestra / frase de
   recuperação com 128 MB, t=3, p=4**. Elas vivem só na memória do processo
   main, dentro do `VaultSessionManager` (Singleton, `src/main/session.ts`),
@@ -80,13 +81,14 @@ contrário).
   app; nunca passam por IPC e nunca aparecem em log. Erros do cofre não ecoam
   senha, PIN ou frase, e o desbloqueio é uma cadeia (`src/main/unlock.ts`) em
   que a trava exponencial corta antes da derivação Argon2id.
-- **AES-256-GCM por registro**: salt e IV de 128 bits gerados por hardware,
-  chave por arquivo via HKDF-SHA512; `vault.zkv` (versão 5) guarda cada chave
+- **AES-256-GCM por registro**: cada arquivo usa um salt e um IV aleatórios de
+  128 bits, gerados por `crypto.randomBytes` do Node.js. A chave de cada arquivo
+  é derivada via HKDF-SHA512; `vault.zkv` (versão 5) guarda cada chave
   embrulhada com o custo do Argon2id daquele método, a trava exponencial, o
   contador de tentativas da senha mestra, o limite de autodestruição e o
-  manifesto cifrado. Cofres nas versões 2 e 3 continuam legíveis: a v3 tem o
-  KDF por método e a v2 um KDF global, e cada método é reembrulhado com o custo
-  atual no desbloqueio em que a credencial dele é usada.
+  manifesto cifrado. O container aceita somente v5; versões anteriores são
+  recusadas como formato incompatível. O custo por método pode ser atualizado
+  no desbloqueio em que a credencial correspondente é usada.
 - **Integridade fail-closed**: o manifesto cifrado lista os registros; arquivo
   removido ou injetado de fora do app vira um único erro de adulteração, sem
   detalhes: nada é carregado.
@@ -135,16 +137,18 @@ contrário).
   ao `.deb` que o usuário instala.
 - **Sem servidor intermediário**: o app não abre conexão de rede alguma: não
   há endpoint do Guardinha a atacar; credenciais nunca saem da máquina.
-- **Confinamento AppArmor**: o `.deb` instala um perfil restritivo em
+- **Confinamento AppArmor**: o `.deb` inclui um perfil restritivo em
   `/etc/apparmor.d/guardinha` (origem `build/apparmor-profile`, declarado em
   `build.deb.appArmorProfile`) sobre o executável
-  `/opt/Guardinha/guardinha`. Ele nega leitura de arquivos do usuário, nega
+  `/opt/Guardinha/guardinha`, quando AppArmor está ativo e aceita o perfil. Ele
+  nega leitura de arquivos do usuário, nega
   escrita fora dos diretórios do app, do cofre e do `$XDG_CONFIG_HOME` do
   app, nega rede `inet`/`inet6` (só `unix` e `netlink`, já que o app é
   offline) e nega execução de qualquer binário fora da lista curta do pacote
   (`chrome-sandbox`, `chrome_crashpad_handler`) e dos dois helpers do sistema
-  (`pkexec`, `xdg-open`). Validado em `enforce` com zero negações de operação
-  legítima no ciclo de vida completo do app.
+  (`pkexec`, `xdg-open`). O script de instalação testa se o perfil é aceito
+  pela versão de AppArmor instalada antes de o carregar; ambientes sem suporte
+  continuam sem esse confinamento adicional.
 
 ## Riscos aceitos (com justificativa)
 

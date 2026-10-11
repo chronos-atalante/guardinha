@@ -23,11 +23,9 @@ de `Chronos/Biblioteca/bin/` ou baixe as releases correspondentes.
 
 ## O banner do README
 
-`docs/assets/banner.png` é a capa do README e a fonte é
-[`build/banner.html`](../build/banner.html): a mesma paleta da landing page
-(`src/app/style/globals.css`) e as mesmas formas do hero
-(`src/components/HomeContent.tsx`), em 1280x400. É o único PNG do repositório
-que não sai de código, então o HTML fica versionado ao lado.
+`docs/assets/banner.png` é a capa do README; [`build/banner.html`](../build/banner.html)
+é sua fonte em 1280x400. O HTML fica versionado ao lado do script que permite
+reproduzir a imagem.
 
 Para regerar: troque `ICON_PATH` por `build/icon.png`, abra o HTML numa
 `BrowserWindow` de 1280x400 (`useContentSize: true`, `frame: false`,
@@ -67,18 +65,19 @@ Bloco `build` do `package.json`:
 Além do padrão do electron-builder (link do executável, AppArmor, banco de
 MIME), ele:
 
-1. Renomeia layouts antigos (`/var/lib/guardinha` para `/var/lib/.guardinha`)
-   preservando os dados.
-2. Cria a raiz com `root:root 0711` e `.vault` com `0700` no dono de quem
-   instalou (`SUDO_UID`/`PKEXEC_UID`).
+1. Cria a raiz `/var/lib/.guardinha` com `root:root 0711`; não migra nem
+   renomeia formatos ou layouts de cofre anteriores.
+2. Se identifica quem instalou por `SUDO_UID`/`PKEXEC_UID`, cria `.vault` com
+   `0700` e atribui o diretório a esse usuário. Sem essa identificação, o app
+   pode criar a estrutura via PolicyKit no primeiro uso.
 3. Escreve a ação do PolicyKit em
    `/usr/share/polkit-1/actions/com.guardinha.keypass.policy`, que autoriza o
    `pkexec` a rodar o helper `guardinha-setup`.
 
 ### `guardinha-setup`
 
-Executado como root pelo `pkexec`, só cria e renomeia diretórios fixos com
-modos fixos: nenhum caminho vem do chamador. O dono vem de `PKEXEC_UID`.
+Executado como root pelo `pkexec`, só cria os diretórios fixos com modos
+fixos: nenhum caminho vem do chamador. O dono vem de `PKEXEC_UID`.
 
 ### `after-remove.sh` (postrm)
 

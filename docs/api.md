@@ -114,10 +114,10 @@ a chave do cofre e com rótulo de domínio HKDF próprio
 
 ## `window.api.settings`
 
-| Método          | Canal          | Payload → retorno           | Descrição                                                        |
-| --------------- | -------------- | --------------------------- | ---------------------------------------------------------------- |
-| `get()`         | `settings:get` | `→ AppSettings`             | `language` (`'pt-BR' \| `'en'`), default `pt-BR`.                |
-| `set(settings)` | `settings:set` | `AppSettings → AppSettings` | Normaliza e grava em `$XDG_CONFIG_HOME/guardinha/settings.json`. |
+| Método          | Canal          | Payload → retorno           | Descrição                                                                   |
+| --------------- | -------------- | --------------------------- | --------------------------------------------------------------------------- |
+| `get()`         | `settings:get` | `→ AppSettings`             | `language` (`'pt-BR' \| 'zh-CN' \| 'ko' \| 'ja' \| 'en'`), default `pt-BR`. |
+| `set(settings)` | `settings:set` | `AppSettings → AppSettings` | Normaliza e grava em `$XDG_CONFIG_HOME/guardinha/settings.json`.            |
 
 ## Tipos (`src/types/`)
 

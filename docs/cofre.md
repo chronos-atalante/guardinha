@@ -13,6 +13,7 @@ backup sincronizado.
 | `/var/lib/.guardinha/.vault/`              | usuário, `0700`  | Diretório do cofre                              |
 | `.vault/vault.zkv`                         | do usuário       | Container: chaves embrulhadas, trava, manifesto |
 | `.vault/.entries/<uuid>.zke`               | do usuário       | Uma credencial salva, cifrada por arquivo       |
+| `.vault/.auth/<uuid>.zka`                  | do usuário       | Um token TOTP, cifrado por arquivo              |
 | `$XDG_CONFIG_HOME/guardinha/settings.json` | do usuário       | Preferências (idioma)                           |
 
 O `npm run dev` não usa `/var/lib`: ele aponta o cofre para `.dev-vault/` na
@@ -21,7 +22,8 @@ raiz do projeto por meio de `GUARDINHA_VAULT_DIR`.
 ### Quem cria a pasta
 
 1. O `postinst` do `.deb` (`build/scripts/after-install.sh`) cria a raiz com
-   `root:root 0711` e `.vault` com `0700` no dono de quem instalou.
+   `root:root 0711` e, quando identifica o usuário instalador, `.vault` com
+   `0700` e propriedade dele.
 2. Se faltar permissão no primeiro uso, o app chama `pkexec` com o helper
    `guardinha-setup` (ação PolicyKit `com.guardinha.keypass.setup-vault`). A
    senha é digitada no diálogo do sistema e nunca passa pelo app.
@@ -33,7 +35,8 @@ raiz do projeto por meio de `GUARDINHA_VAULT_DIR`.
 Arquivo binário com magic `ZKVAULT1`, escrito e lido apenas em
 `src/main/container.ts`. Toda leitura é fail-closed: forma inválida,
 truncamento, parâmetro fora da faixa, flag desconhecida ou byte a mais no fim
-devolvem `null` (tratado como adulterado), nunca conteúdo em claro.
+são recusados como adulteração; uma versão diferente de 5 recebe um erro
+específico de formato incompatível. Nunca é devolvido conteúdo em claro.
 
 Cabeçalho de **41 bytes**, versão 5 (valores em big endian):
 
@@ -51,17 +54,18 @@ Cabeçalho de **41 bytes**, versão 5 (valores em big endian):
 O cabeçalho é único e fixo: **não há caminho de leitura para versão anterior**.
 A v4 tinha no meio um tripo de KDF global que era só informativo desde a v3 (cada
 método já carrega o custo do seu Argon2id, e o PIN precisa ser mais caro que a
-senha mestra, então um campo só não representava os dois); a v5 o removeu e ficou
-com 41 bytes. Qualquer versão diferente de `5` é tratada como arquivo
-estranho ou de futuro e devolve `null` (fail-closed). O app ainda não tem
-usuários, então formato anterior não tinha a quem proteger.
+senha mestra, então um campo só não representava os dois); a v5 o removeu e
+ficou com 41 bytes. Qualquer versão diferente de `5` é recusada como formato
+incompatível (fail-closed), em vez de ser classificada como arquivo adulterado.
+O app ainda não tinha usuários ao remover a compatibilidade com os formatos
+anteriores.
 
 Depois do cabeçalho vêm os blocos indicados pelas flags, nesta ordem: chave
 embrulhada da senha mestra, do PIN, da frase de recuperação, do **PIN de
 coação** e o manifesto. Cada bloco traz
-`salt(16) + iv(16) + tag(16) + tamanho(4) + texto cifrado`; em **v3 e v4**
-cada método também traz os próprios 12 bytes de parâmetros Argon2id antes do
-salt.
+`salt(16) + iv(16) + tag(16) + tamanho(4) + texto cifrado`. No container v5,
+cada método também traz os próprios 12 bytes de parâmetros Argon2id e um salt
+de KDF de 16 bytes antes do bloco cifrado.
 
 ## Custo do Argon2id por método
 
@@ -166,10 +170,11 @@ JSON guarda `id`, `title`, `username`, `password`, `domain`, `notes`,
 
 ## Manifesto de integridade
 
-O `vault.zkv` guarda também uma lista cifrada dos ids de credencial
-(`manifest`). Ao listar, o main compara manifesto e diretório: arquivo removido
-ou injetado de fora do app vira um único erro de adulteração, sem detalhes, e
-nada é carregado (`src/main/storage.ts`, `verifyManifest`).
+O `vault.zkv` guarda também uma lista cifrada dos ids de credenciais (`ids`) e
+de tokens de 2FA (`authIds`) no manifesto. Ao listar, o main compara o
+manifesto com os diretórios `.entries` e `.auth`: arquivo removido ou injetado
+de fora do app vira um único erro de adulteração, sem detalhes, e nada é
+carregado (`src/main/storage.ts`, `verifyManifest`).
 
 ## Trava exponencial e auto-lock
 
@@ -180,8 +185,9 @@ nada é carregado (`src/main/storage.ts`, `verifyManifest`).
 - Sucesso zera as tentativas; o contador também pode ser zerado por teste ou
   pela redefinição de PIN.
 - Sem atividade por 5 minutos a chave é zerada e o cofre bloqueia
-  (`IDLE_LOCK_MS` em `src/main/activity.ts`). O renderer só percebe na próxima
-  consulta de status (a cada 15 s).
+  (`IDLE_LOCK_MS` em `src/main/activity.ts`). O main notifica o renderer pelo
+  evento `vault:auto-locked`; a consulta de status a cada 15 s é apenas uma
+  rede de segurança.
 
 ## Migrações automáticas
 
@@ -192,9 +198,9 @@ layout visível `entries/`, o payload `.enc` e o container v2/v3) foi removido
 com a migration completa: o app ainda não tinha usuário para proteger.
 
 A única coisa que ainda sobe sozinha é o **custo do Argon2id por método**: um
-cofre gravado com um perfil mais barato é reembrulhado no próximo desbloqueio
-(`upgradeMethod`, em `vault.ts`), porque só quem tem a credencial consegue
-reembrulhar. Isso não muda o formato, é o custo que o serviço merece hoje.
+método gravado com perfil mais barato é reembrulhado no próximo desbloqueio
+feito com essa credencial (`upgradeMethod`, em `vault.ts`), porque só quem tem a
+credencial consegue reembrulhar. Isso não muda o formato.
 
 ## Variáveis de ambiente
 

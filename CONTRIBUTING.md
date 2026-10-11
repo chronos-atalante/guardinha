@@ -20,7 +20,7 @@ npm run dev     # abre o app com hot reload (cofre de teste em .dev-vault/)
 | `npm run dev`                | desenvolver com recarregamento automático                                |
 | `npm test`                   | rodar a suíte Vitest                                                     |
 | `npm run check`              | **obrigatório antes de commitar** (tipos + lint + formato + OSV + shell) |
-| `npm run clean`              | apagar a pasta `out/` (build anterior)                                   |
+| `npm run clean`              | apagar `out/` e `release/` (builds anteriores)                           |
 | `npm run build`              | compilar main/preload/renderer                                           |
 | `npm run dist`               | gerar o `.deb` em `release/`                                             |
 | `npm run security:audit`     | auditoria de vulnerabilidades (OSV Scanner)                              |
@@ -43,7 +43,8 @@ git (ver `AGENTS.md`, seção Comandos).
   `unknown` + validação nas fronteiras (JSON, IPC).
 - **Arquivos com ~500 linhas devem ser quebrados** em módulos/componentes.
 - Textos de UI e mensagens de erro **só em `src/messages/`** (pt-BR é o
-  canônico; `en.ts` fecha com o tipo `Messages`); ver `docs/messages.md`.
+  canônico; todos os outros idiomas fecham com o tipo `Messages`); ver
+  `docs/messages.md`.
 - Rode `node --import ./src/node.loader.ts <arquivo.ts>` para executar um `.ts`
   direto no Node com os aliases resolvidos.
 

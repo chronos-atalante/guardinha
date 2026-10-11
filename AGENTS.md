@@ -23,8 +23,8 @@ Camadas:
   exponencial (`auth.ts`), sudo via PolicyKit (`privilege.ts`), gerador de 2FA
   (`authenticator.ts`, `auth-store.ts`, `totp.ts`) e idioma (`settings.ts`,
   `i18n.ts`).
-- `src/messages/`: textos do app em pt-BR (canônico) e en (`@zero/messages`);
-  guia em `docs/messages.md`.
+- `src/messages/`: textos do app em pt-BR (canônico), zh-CN, ko, ja e en
+  (`@zero/messages`); guia em `docs/messages.md`.
 - `src/preload/`: única ponte da UI; monta e expõe `window.api` tipado.
 - `src/renderer/`: React; não acessa disco, rede nem Node direto.
 - `src/shared/`: regras puras compartilhadas por `main` e `renderer`
@@ -116,11 +116,11 @@ Camadas:
   espelhado em `electron.vite.config.mts`, `vitest.config.mts` e
   `src/node.loader.ts`; mudar um alias vale nos quatro.
 - Arquivos no teto de ~500 linhas; passou disso, extraia módulos.
-- `fs` no main fica nos módulos de persistência: `storage.ts` (o `vault.zkv`),
-  `entries-store.ts` (os `.zke`), `auth-store.ts` (os `.zka`), `structure.ts` (as pastas) e
-  `shred.ts`. A exceção declarada é o `shred.ts`, que é primitiva de baixo
-  nível: recebe sempre um caminho já validado por quem o compôs e não conhece o
-  cofre. `layout.ts` não toca `fs`, só resolve caminhos.
+- `fs` no main fica em `storage.ts` (`vault.zkv`), `entries-store.ts` (`.zke`),
+  `auth-store.ts` (`.zka`), `structure.ts` (pastas), `settings.ts`
+  (preferências não sensíveis em `settings.json`) e `shred.ts`. Este último é
+  uma primitiva de baixo nível: recebe um caminho validado por quem o compôs e
+  não conhece o cofre. `layout.ts` não toca `fs`, só resolve caminhos.
 - Type safety: `strict`, `noUncheckedIndexedAccess`,
   `exactOptionalPropertyTypes`, `noImplicitReturns` e `verbatimModuleSyntax`
   (import de tipo sempre `import type`). Sem `any`, sem cast gratuito.
@@ -128,8 +128,8 @@ Camadas:
   desligue regra de lint para passar, corrija o código.
 - `console` só `warn`/`error` (regra do ESLint); nenhum `debugger`/`alert`.
 - Textos fixos de UI e mensagens de erro **só em `src/messages/`** (pt-BR é o
-  canônico; `en.ts` deve fechar com `Messages`): no renderer use
-  `useMessages()`/`richText()` (`src/renderer/src/i18n.tsx`), no main
+  canônico; todos os outros bundles devem fechar com `Messages`): no renderer
+  use `useMessages()`/`richText()` (`src/renderer/src/i18n.tsx`), no main
   `currentMessages()` (`src/main/i18n.ts`). Marcadores ricos `**negrito**` e
   `` `código` `` só em string exibida. Dados por dependência
   (`attributions.ts`) e logs ficam fora dos bundles (`docs/messages.md`).
