@@ -7,7 +7,8 @@ import { AuthTokenModal } from '@zero/renderer/components/AuthTokenModal';
 import { installApi } from '../mocks/api.ts';
 import type { AuthCode, AuthToken } from '@zero/types';
 
-const GITHUB_URI = 'otpauth://totp/GitHub:alice@github.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub';
+const GITHUB_URI =
+  'otpauth://totp/GitHub:alice@github.com?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=GitHub';
 
 function token(overrides: Partial<AuthToken> = {}): AuthToken {
   return {
@@ -61,7 +62,7 @@ describe('tela do verificador 2FA', () => {
     renderScreen([token()], [code('aaaaaaaa-1111-4111-8111-111111111111')]);
 
     expect(await screen.findByText('071271')).toBeInTheDocument();
-    expect(screen.queryByText(/JBSWY3DPEHPK3PXP/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ/)).not.toBeInTheDocument();
   });
 
   it('mostra o estado vazio com a instrução de como adicionar', async () => {
@@ -470,7 +471,8 @@ describe('modal de token', () => {
 
     // abrir para editar já vem nos campos, com o serviço preenchido
     expect(screen.getByDisplayValue('GitHub')).toBeInTheDocument();
-    await user.type(screen.getByPlaceholderText('JBSW Y3DP EHPK 3PXP'), 'MZXW6YTBOI');
+    const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+    await user.type(screen.getByPlaceholderText('JBSW Y3DP EHPK 3PXP'), secret);
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => {
@@ -478,7 +480,7 @@ describe('modal de token', () => {
         expect.objectContaining({
           id: 'aaaaaaaa-1111-4111-8111-111111111111',
           issuer: 'GitHub',
-          secret: 'MZXW6YTBOI',
+          secret,
         }),
       );
     });

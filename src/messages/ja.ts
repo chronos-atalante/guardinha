@@ -328,7 +328,8 @@ export const ja: Messages = {
     invalidAuthTokenUri:
       '`otpauth://` アドレスが正しくありません。`otpauth://totp/` から最後まで貼り付けられているか、' +
       'および発行者がラベルと一致しているかを確認してください。',
-    invalidAuthSecret: '設定キーは有効な Base32 である必要があります（A-Z と 2-7）。',
+    invalidAuthSecret:
+      '設定キーは有効な Base32（A-Z と 2-7）で、128 ビット（16 バイト）以上である必要があります。',
     authTokenNotFound: '2FA トークンが見つかりません。',
     internal: '金庫内部のエラーです。',
   },

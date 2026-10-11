@@ -28,12 +28,17 @@ serviço recusa.
 
 ### Formatos suportados
 
-| Parâmetro   | Valores                        | Observação    |
-| ----------- | ------------------------------ | ------------- |
-| `algorithm` | `SHA1`, `SHA256`, `SHA512`     | padrão `SHA1` |
-| `digits`    | `6`, `8`                       | padrão `6`    |
-| `period`    | 15 a 300 s                     | padrão `30`   |
-| `secret`    | Base32 (RFC 4648), sem padding | obrigatório   |
+| Parâmetro   | Valores                        | Observação                    |
+| ----------- | ------------------------------ | ----------------------------- |
+| `algorithm` | `SHA1`, `SHA256`, `SHA512`     | padrão `SHA1`                 |
+| `digits`    | `6`, `8`                       | padrão `6`                    |
+| `period`    | 15 a 300 s                     | padrão `30`                   |
+| `secret`    | Base32 (RFC 4648), sem padding | mínimo de 128 bits (16 bytes) |
+
+O cadastro recusa segredos com menos de 128 bits, conforme o mínimo exigido
+pela RFC 4226. A validação ocorre no parser compartilhado e novamente no
+processo principal; usar SHA-1, SHA-256 ou SHA-512 continua sendo uma escolha
+do serviço, não uma forma de compensar uma chave curta.
 
 ### Formato de provisionamento
 
@@ -92,6 +97,8 @@ por token, no mesmo formato dos `.zke` das credenciais:
   `guardinha-vault-auth-v1`, **diferente** do `guardinha-vault-entry-v1` das
   credenciais, para que os dois nunca derivem a mesma chave nem por acidente;
 - escrita atômica (`.tmp` + `rename`), arquivo em `0600`, pasta em `0700`.
+- cadastro exige pelo menos 128 bits de segredo, independente do algoritmo
+  HMAC selecionado.
 
 A pasta fica **dentro** de `.vault` e não como irmã por um motivo concreto: a
 raiz `/var/lib/.guardinha/` é do sistema (`root:root 0711`, criada no

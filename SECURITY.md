@@ -36,6 +36,11 @@ contrário).
   impedir o descuido. O segredo fica em `.vault/.auth/<uuid>.zka`, cifrado em
   AES-256-GCM com um rótulo de domínio HKDF próprio, separado do das
   credenciais.
+- **Comprimento mínimo do segredo 2FA**: o cadastro exige pelo menos 128 bits
+  (16 bytes) de segredo Base32, conforme o mínimo da RFC 4226. A validação
+  ocorre no parser compartilhado e novamente no processo main, inclusive para
+  entradas enviadas diretamente por IPC. O algoritmo HMAC (SHA-1, SHA-256 ou
+  SHA-512) continua definido pelo serviço e não substitui esse requisito.
 - **Manifesto cobre os tokens de 2FA**: a versão 2 do manifesto lista também os
   ids de `.auth/`, então apagar um `.zka` ou plantar o próprio derruba a listagem
   com o erro único de adulteração, como já acontecia com as credenciais.

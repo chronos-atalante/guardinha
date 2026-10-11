@@ -165,14 +165,14 @@ describe('preload: canais de 2FA', () => {
   });
 
   it('mapeia os cinco canais do autenticador', async () => {
-    const uri = 'otpauth://totp/GitHub:eu?secret=JBSWY3DPEHPK3PXP&issuer=GitHub';
+    const uri = 'otpauth://totp/GitHub:eu?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=GitHub';
     const draft = {
       issuer: 'GitHub',
       account: 'eu',
       algorithm: 'SHA1' as const,
       digits: 6,
       period: 30,
-      secret: 'JBSWY3DPEHPK3PXP',
+      secret: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
     };
 
     await loaded.api.authenticator.list();

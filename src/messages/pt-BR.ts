@@ -323,7 +323,8 @@ export const ptBR = {
     invalidAuthTokenUri:
       'Endereço `otpauth://` inválido. Confira se colou o endereço inteiro, ' +
       'começando em `otpauth://totp/`, e se o emissor bate com o rótulo.',
-    invalidAuthSecret: 'A chave de configuração precisa ser Base32 válido (A-Z e 2-7).',
+    invalidAuthSecret:
+      'A chave precisa ser Base32 válido (A-Z e 2-7) e ter pelo menos 128 bits (16 bytes).',
     authTokenNotFound: 'Token de 2FA não encontrado.',
     internal: 'Erro interno do cofre.',
   },

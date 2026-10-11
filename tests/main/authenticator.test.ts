@@ -20,7 +20,8 @@ const PIN = '49201733';
 const PHRASE = 'Na feira de hoje o cavalo branco comeu exatamente doze cenouras gigantes';
 
 const TAMPERED = currentMessages().errors.vaultTampered;
-const GITHUB_URI = 'otpauth://totp/GitHub:alice@github.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub';
+const STRONG_SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+const GITHUB_URI = `otpauth://totp/GitHub:alice@github.com?secret=${STRONG_SECRET}&issuer=GitHub`;
 
 function draft(overrides: Record<string, unknown> = {}): {
   issuer: string;
@@ -36,7 +37,7 @@ function draft(overrides: Record<string, unknown> = {}): {
     algorithm: 'SHA1',
     digits: 6,
     period: 30,
-    secret: 'JBSWY3DPEHPK3PXP',
+    secret: STRONG_SECRET,
     ...overrides,
   };
 }
@@ -72,7 +73,7 @@ describe('tokens de 2FA', () => {
   it('NENHUM retorno carrega o segredo: só id, rótulo e parâmetros', () => {
     const [token] = saveTokenFromUri(GITHUB_URI);
     const serialized = JSON.stringify([token, listTokens(), currentCodes()]);
-    expect(serialized).not.toContain('JBSWY3DPEHPK3PXP');
+    expect(serialized).not.toContain(STRONG_SECRET);
     expect(token).not.toHaveProperty('secret');
   });
 
@@ -82,7 +83,7 @@ describe('tokens de 2FA', () => {
     expect(fs.existsSync(file)).toBe(true);
     expect(fs.statSync(file).mode & 0o777).toBe(0o600);
     const raw = fs.readFileSync(file).toString('latin1');
-    expect(raw).not.toContain('JBSWY3DPEHPK3PXP');
+    expect(raw).not.toContain(STRONG_SECRET);
     expect(raw).not.toContain('GitHub');
   });
 
@@ -95,9 +96,9 @@ describe('tokens de 2FA', () => {
 
   it('o código gerado bate com o cálculo de referência', () => {
     const [token] = saveTokenFromUri(GITHUB_URI);
-    // segredo de exemplo da wiki do Google: "Hello!" + DE AD BE EF
+    // vetor RFC 6238: a chave "12345678901234567890" em Base32
     const codes = currentCodes(1111111109 * 1000);
-    expect(codes.find((item) => item.id === token?.id)?.code).toBe('071271');
+    expect(codes.find((item) => item.id === token?.id)?.code).toBe('081804');
   });
 
   it('devolve o tempo restante do período, para a barra da tela', () => {
@@ -107,8 +108,17 @@ describe('tokens de 2FA', () => {
     expect(code?.remainingMs).toBeLessThanOrEqual(30_000);
   });
 
-  it('recusa segredo fora do alfabeto base32', () => {
+  it('recusa segredo fora do alfabeto base32 ou menor que 128 bits', () => {
     expect(() => saveToken(draft({ secret: 'JBSWY3DP1EHPK3PXP' }))).toThrow(
+      currentMessages().errors.invalidAuthSecret,
+    );
+    expect(() => saveToken(draft({ secret: 'JBSWY3DPEHPK3PXP' }))).toThrow(
+      currentMessages().errors.invalidAuthSecret,
+    );
+    expect(() => saveToken(draft({ secret: 'A'.repeat(25) }))).toThrow(
+      currentMessages().errors.invalidAuthSecret,
+    );
+    expect(() => saveToken(draft({ secret: 'AA' }))).toThrow(
       currentMessages().errors.invalidAuthSecret,
     );
     expect(() => saveToken(draft({ secret: '' }))).toThrow(
@@ -164,7 +174,7 @@ describe('tokens de 2FA', () => {
           algorithm: 'SHA1',
           digits: 6,
           period: 30,
-          secret: 'JBSWY3DPEHPK3PXP',
+          secret: STRONG_SECRET,
           createdAt: 1,
           updatedAt: 1,
         },
