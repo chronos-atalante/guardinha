@@ -1,4 +1,4 @@
-import type { ElectronApi, PanicStatus, VaultStatus } from '@zero/types';
+import type { AuthToken, ElectronApi, PanicStatus, VaultStatus } from '@zero/types';
 
 export const UNLOCKED: VaultStatus = {
   exists: true,
@@ -24,6 +24,7 @@ export function installApi(
   overrides: {
     status?: VaultStatus;
     entries?: ElectronApi['entries']['list'] extends () => Promise<infer T> ? T : never;
+    tokens?: AuthToken[];
     language?: 'pt-BR' | 'en';
     panic?: PanicStatus;
   } = {},
@@ -53,6 +54,13 @@ export function installApi(
       list: () => Promise.resolve(entries),
       save: () => Promise.resolve(entries),
       remove: () => Promise.resolve([]),
+    },
+    authenticator: {
+      list: () => Promise.resolve(overrides.tokens ?? []),
+      saveUri: unused,
+      save: unused,
+      remove: () => Promise.resolve(overrides.tokens ?? []),
+      codes: () => Promise.resolve([]),
     },
     generator: { generate: () => Promise.resolve('senha-gerada-123') },
     settings: {

@@ -5,6 +5,7 @@ import { Sidebar } from '@zero/renderer/components/Sidebar';
 import type { TabType } from '@zero/renderer/components/Sidebar';
 import { Home } from '@zero/renderer/components/Home';
 import { Generator } from '@zero/renderer/components/Generator';
+import { Authenticator } from '@zero/renderer/components/Authenticator';
 import { Credits } from '@zero/renderer/components/Credits';
 import { Settings } from '@zero/renderer/components/Settings';
 import { AuthModal } from '@zero/renderer/components/AuthModal';
@@ -64,6 +65,7 @@ function Shell({ status, language, onLanguageChange, onRefresh }: ShellProps): J
       <main className="flex-1 bg-slate-950 overflow-y-auto p-8">
         {activeTab === 'home' && <Home onToast={setToast} />}
         {activeTab === 'generator' && <Generator onToast={setToast} />}
+        {activeTab === 'authenticator' && <Authenticator onToast={setToast} />}
         {activeTab === 'credits' && <Credits />}
         {activeTab === 'settings' && <Settings />}
       </main>

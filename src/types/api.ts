@@ -1,5 +1,6 @@
 import type { GeneratorOptions } from '@zero/types/generator';
 import type { AppSettings } from '@zero/types/settings';
+import type { AuthCode, AuthToken, AuthTokenDraft } from '@zero/types/authenticator';
 import type {
   CreateVaultInput,
   Credential,
@@ -54,6 +55,23 @@ export interface ElectronApi {
     list: () => Promise<Credential[]>;
     save: (entry: CredentialInput) => Promise<Credential[]>;
     remove: (id: string) => Promise<Credential[]>;
+  };
+  /**
+   * Gerador de códigos de 2FA (TOTP, RFC 6238).
+   *
+   * O segredo do token **não faz parte de nenhum retorno**. `list` devolve só
+   * metadados e `codes` devolve o número já calculado: quem pede o código nunca
+   * vê o segredo, e o processo da interface nunca o tem em memória.
+   */
+  authenticator: {
+    list: () => Promise<AuthToken[]>;
+    /** Salva a URI `otpauth://` que o serviço exibiu. */
+    saveUri: (uri: string) => Promise<AuthToken[]>;
+    /** Salva com o segredo digitado à mão, para quem não tem QR legível. */
+    save: (token: AuthTokenDraft) => Promise<AuthToken[]>;
+    remove: (id: string) => Promise<AuthToken[]>;
+    /** Códigos de todos os tokens no instante atual (uma chamada por período). */
+    codes: () => Promise<AuthCode[]>;
   };
   generator: {
     generate: (options: GeneratorOptions) => Promise<string>;

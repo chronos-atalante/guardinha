@@ -1,4 +1,10 @@
 export type { ElectronApi } from '@zero/types/api';
+export type {
+  AuthCode,
+  AuthToken,
+  AuthTokenDraft,
+  AuthTokenInput,
+} from '@zero/types/authenticator';
 export type { GeneratorOptions } from '@zero/types/generator';
 export type { AppSettings, Language } from '@zero/types/settings';
 export type {

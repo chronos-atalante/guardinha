@@ -27,6 +27,7 @@ export const en: Messages = {
     nav: {
       home: 'Home (Passwords)',
       generator: 'Password Generator',
+      authenticator: '2FA Verifier',
       credits: 'Attributions',
       settings: 'Settings',
     },
@@ -169,6 +170,52 @@ export const en: Messages = {
     toastCopied: 'Password copied.',
   },
 
+  /** One-time codes for two-step verification (TOTP, RFC 6238). */
+  authenticator: {
+    title: '2FA Verifier',
+    subtitle:
+      'One-time codes that sites ask for after the password. ' +
+      'Each token lives in its own encrypted file inside the vault.',
+    loading: 'Opening tokens…',
+    emptyTitle: 'No token yet',
+    emptyText:
+      'Turn on two-step verification at the service, pick "Can\'t scan it" ' +
+      'and paste here the `otpauth://` address or the setup key.',
+    addToken: 'Add token',
+    modalNew: 'New 2FA token',
+    modalEdit: 'Edit 2FA token',
+    tabUri: 'otpauth:// address',
+    tabManual: 'Type the key',
+    uriLabel: 'Address the site showed',
+    uriPlaceholder: 'otpauth://totp/GitHub:you?secret=…&issuer=GitHub',
+    uriHint:
+      'Paste the whole address, secret included. It is decrypted inside the vault ' +
+      'and **never saved anywhere else**.',
+    secretLabel: 'Setup key (Base32)',
+    secretPlaceholder: 'JBSW Y3DP EHPK 3PXP',
+    secretHint: 'The key is normalized: uppercase, no spaces and no dashes.',
+    issuerLabel: 'Service',
+    issuerPlaceholder: 'GitHub',
+    accountLabel: 'Account',
+    accountPlaceholder: 'you@example.com',
+    algorithmLabel: 'Algorithm',
+    digitsLabel: 'Digits',
+    periodLabel: 'Lifetime (seconds)',
+    algorithmHint:
+      'The service picks the algorithm, not us. **SHA1** is the default for ' +
+      'GitHub, Discord, Google and most others; SHA256 and SHA512 exist for the few that ask.',
+    deleteConfirm: 'Delete this 2FA token? This cannot be undone.',
+    saveError: 'Could not save the token.',
+    removeError: 'Could not remove the token.',
+    loadError: 'Could not load the tokens.',
+    toastSaved: 'Token saved.',
+    toastRemoved: 'Token removed.',
+    toastCopied: 'Code copied. It expires in a few seconds.',
+    issuerFallback: 'No service',
+    expiresIn: (seconds: number): string => `expires in ${seconds}s`,
+    expiringSoon: 'renewing',
+  },
+
   attributions: {
     title: 'ATTRIBUTIONS',
     footer: '© 2026, 100% Offline & Local Data Protection',
@@ -258,6 +305,12 @@ export const en: Messages = {
     invalidId: 'Invalid credential identifier.',
     entryNotFound: 'Credential not found.',
     invalidGenerator: 'Invalid password generator parameters.',
+    invalidAuthToken: 'Invalid 2FA token parameters.',
+    invalidAuthTokenUri:
+      'Invalid `otpauth://` address. Check that you pasted the whole address, ' +
+      'starting with `otpauth://totp/`, and that the issuer matches the label.',
+    invalidAuthSecret: 'The setup key must be valid Base32 (A-Z and 2-7).',
+    authTokenNotFound: '2FA token not found.',
     internal: 'Internal vault error.',
   },
 };

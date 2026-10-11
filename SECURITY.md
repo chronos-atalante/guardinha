@@ -4,6 +4,7 @@
 
 | Versão | Suporte             |
 | ------ | ------------------- |
+| 1.5.x  | ✅ Correções ativas |
 | 1.4.x  | ✅ Correções ativas |
 | 1.3.x  | ✅ Correções ativas |
 | 1.1.x  | ✅ Correções ativas |
@@ -26,6 +27,17 @@ contrário).
 
 ## Proteções já existentes
 
+- **Segredo de 2FA fora do renderer**: o segredo TOTP de um token não é retorno
+  de nenhum canal de IPC. O renderer pede o código já calculado
+  (`authenticator:codes`) e recebe `{ id, code, remainingMs }`, de modo que a
+  chave nunca existe no processo que tem DOM e executa o JavaScript da página.
+  O tipo `AuthToken` não tem o campo `secret` justamente para o contrato
+  impedir o descuido. O segredo fica em `.vault/.auth/<uuid>.zka`, cifrado em
+  AES-256-GCM com um rótulo de domínio HKDF próprio, separado do das
+  credenciais.
+- **Manifesto cobre os tokens de 2FA**: a versão 2 do manifesto lista também os
+  ids de `.auth/`, então apagar um `.zka` ou plantar o próprio derruba a listagem
+  com o erro único de adulteração, como já acontecia com as credenciais.
 - **Cryptographic Erase (autodestruição do cofre)**: apagar o `vault.zkv` é o
   que destrói o cofre, porque ele é o único lugar onde existe a chave do cofre
   embrulhada. Sem a chave, cada `.zke` vira ruído matemático e o AES-256-GCM
@@ -251,3 +263,7 @@ contrário).
   (GitHub, npm, sites abertos pelo navegador).
 - Falhas que exijam acesso físico ao PC já desbloqueado ou malware rodando
   como o próprio usuário (mesmo nível de ameaça da chave em memória).
+- **Esquemas de 2FA fora do padrão TOTP**, como o Steam Guard (5 caracteres
+  alfanuméricos de alfabeto customizado) e códigos por SMS ou e-mail. O app
+  implementa o `otpauth://totp` da RFC 6238 e recusa qualquer outra coisa, em
+  vez de mostrar um número que o serviço não aceitaria.

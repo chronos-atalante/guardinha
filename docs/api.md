@@ -85,6 +85,27 @@ texto (o handler recusa outro tipo de payload).
 | `save(entry)` | `entries:save`   | `CredentialInput → Credential[]` | Cria (sem `id`) ou atualiza; valida título/usuário/domínio. |
 | `remove(id)`  | `entries:delete` | `string → Credential[]`          | Apaga o arquivo cifrado.                                    |
 
+## `window.api.authenticator`
+
+| Método         | Canal                    | Payload → retorno              | Descrição                                                   |
+| -------------- | ------------------------ | ------------------------------ | ----------------------------------------------------------- |
+| `list()`       | `authenticator:list`     | `→ AuthToken[]`                | Metadados dos tokens (precisa desbloqueado). Sem o segredo. |
+| `saveUri(uri)` | `authenticator:save-uri` | `string → AuthToken[]`         | Salva a URI `otpauth://` que o serviço exibiu.              |
+| `save(token)`  | `authenticator:save`     | `AuthTokenDraft → AuthToken[]` | Salva com a chave digitada à mão (id ausente cria um novo). |
+| `remove(id)`   | `authenticator:delete`   | `string → AuthToken[]`         | Apaga o arquivo cifrado do token.                           |
+| `codes()`      | `authenticator:codes`    | `→ AuthCode[]`                 | `{ id, code, remainingMs }` de todos os tokens, agora.      |
+
+**O segredo TOTP não é retorno de nenhum método.** `AuthToken` não tem o campo
+`secret` e `AuthCode` traz o código já calculado: quem pede o número nunca vê a
+chave, e o processo do renderer nunca a tem em memória. É por isso que
+`codes()` é o canal mais sensível do grupo e por isso ele também chama
+`assertAppFrame` e `withSessionNotice` (`src/main/totp.ts`, `src/shared/otpauth.ts`,
+`src/main/authenticator.ts`; detalhes em `docs/autenticador.md`).
+
+O arquivo de cada token é `.vault/.auth/<uuid>.zka`, cifrado em AES-256-GCM com
+a chave do cofre e com rótulo de domínio HKDF próprio
+(`guardinha-vault-auth-v1`), separado do das credenciais.
+
 ## `window.api.generator`
 
 | Método              | Canal                | Payload → retorno           | Descrição                                                                                      |
@@ -105,5 +126,8 @@ texto (o handler recusa outro tipo de payload).
 - `UnlockInput`: `{ credential, kind: 'master' | 'pin' }`
 - `ResetPinInput`: `{ phrase, newPin }` (frase de recuperação + novo PIN)
 - `Credential` / `CredentialInput`: registro da credencial (senha cifrada por arquivo)
+- `AuthToken`: `{ id, issuer, account, algorithm, digits, period, createdAt, updatedAt }` (sem o segredo)
+- `AuthTokenDraft`: o mesmo mais `secret` em Base32, só na entrada do `save`
+- `AuthCode`: `{ id, code, remainingMs }`
 - `GeneratorOptions`: `{ length, useUpper, useNumbers, useSymbols, customEntropyWords }`
 - `AppSettings`: `{ language }`

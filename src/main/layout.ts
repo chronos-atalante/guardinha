@@ -39,6 +39,22 @@ export function entriesDir(): string {
   return path.join(vaultDir(), '.entries');
 }
 
+/**
+ * Tokens de 2FA, uma pasta própria dentro do cofre e um arquivo cifrado por
+ * token (`.auth/<uuid>.zka`), no mesmo formato dos `.zke` das credenciais.
+ *
+ * Fica **dentro** de `.vault` por um motivo que não é aestheticamente pleasing:
+ * a raiz `/var/lib/.guardinha/` é do sistema (`root:root 0711`, criada no
+ * `postinst`) e o Cryptographic Erase não pode mexer nela. Dentro de `.vault`
+ * o token entra na mesma varredura que a credencial, então a autodestruição
+ * alcança os dois sem nenhum caminho novo capaz de esquecer um deles. Um
+ * segredo TOTP que sobrevive ao Cryptographic Erase é uma senha de servidor
+ * que sobrevive a ele.
+ */
+export function authDir(): string {
+  return path.join(vaultDir(), '.auth');
+}
+
 /** Container com as chaves embrulhadas, a trava e o manifesto. */
 export function containerFile(): string {
   return path.join(vaultDir(), 'vault.zkv');

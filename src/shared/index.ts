@@ -1,4 +1,16 @@
+export { base32Decode, base32Encode, isBase32, normalizeBase32 } from '@zero/shared/base32';
 export { formatCountdown } from '@zero/shared/format';
+export {
+  buildOtpAuthUri,
+  OTP_ALGORITHMS,
+  OTP_DEFAULT_ALGORITHM,
+  OTP_DEFAULT_DIGITS,
+  OTP_DEFAULT_PERIOD,
+  OTP_DIGIT_CHOICES,
+  OTP_PERIOD_RANGE,
+  parseOtpAuthUri,
+} from '@zero/shared/otpauth';
+export type { OtpAlgorithm, OtpUri } from '@zero/shared/otpauth';
 export {
   evaluateMaster,
   evaluatePassword,

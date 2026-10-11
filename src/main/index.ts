@@ -17,6 +17,13 @@ import {
 import { activityMonitor } from '@zero/main/activity';
 import { validateDomainFormat } from '@zero/main/auth';
 import { removeEntry, saveEntry, listEntries } from '@zero/main/entries';
+import {
+  currentCodes,
+  listTokens,
+  removeToken,
+  saveToken,
+  saveTokenFromUri,
+} from '@zero/main/authenticator';
 import { generateHighEntropyPassword } from '@zero/main/crypto';
 import { secureClipboard } from '@zero/main/clipboard';
 import { vaultStorage } from '@zero/main/facade';
@@ -24,6 +31,7 @@ import { loadSettings, saveSettings } from '@zero/main/settings';
 import { currentMessages } from '@zero/main/i18n';
 import type {
   AppSettings,
+  AuthTokenDraft,
   CreateVaultInput,
   CredentialInput,
   GeneratorOptions,
@@ -341,6 +349,31 @@ function registerIpc(): void {
   ipcMain.handle('entries:delete', (event, id: string) => {
     assertAppFrame(event);
     return withSessionNotice(() => removeEntry(id));
+  });
+
+  // ---- Gerador de 2FA (TOTP) ----
+  // Todos com `assertAppFrame` e `withSessionNotice`: `codes` é o canal mais
+  // sensível do grupo, porque devolve um número que autentica a conta.
+  ipcMain.handle('authenticator:list', (event) => {
+    assertAppFrame(event);
+    return withSessionNotice(listTokens);
+  });
+  ipcMain.handle('authenticator:save-uri', (event, uri: string) => {
+    assertAppFrame(event);
+    if (typeof uri !== 'string') throw new Error(currentMessages().errors.invalidAuthTokenUri);
+    return withSessionNotice(() => saveTokenFromUri(uri));
+  });
+  ipcMain.handle('authenticator:save', (event, token: AuthTokenDraft) => {
+    assertAppFrame(event);
+    return withSessionNotice(() => saveToken(token));
+  });
+  ipcMain.handle('authenticator:delete', (event, id: string) => {
+    assertAppFrame(event);
+    return withSessionNotice(() => removeToken(id));
+  });
+  ipcMain.handle('authenticator:codes', (event) => {
+    assertAppFrame(event);
+    return withSessionNotice(() => currentCodes());
   });
 
   /** Copia para o clipboard nativo e limpa sozinho 30 s depois (no main). */
