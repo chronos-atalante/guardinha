@@ -49,8 +49,10 @@ Camadas:
   `root:root 0711` sem listagem (navegar/excluir o topo exige sudo) e, quando
   falta permissão, `createVault` chama o helper do pacote via `pkexec`
   (ação PolicyKit `com.guardinha.keypass.setup-vault`; diálogo do sistema: a
-  senha nunca passa pelo app). Migração automática do intermediário
-  `$XDG_DATA_HOME/guardinha/` e do legado `~/.guardinha-vault/` (JSON); raiz
+  senha nunca passa pelo app). **Sem migração de formato**: o container tem uma
+  versão só (a 5), o layout de pastas tem um nome só (`.entries`, `.auth`) e a
+  extensão do payload de credencial tem uma só (`.zke`); os formatos
+  anteriores foram removidos enquanto o app ainda não tinha usuário. Raiz
   sobrepõe com `GUARDINHA_VAR_LIB`, caminho completo com `GUARDINHA_VAULT_DIR`
   (testes; `npm run dev` usa `.dev-vault/`); configurações em
   `$XDG_CONFIG_HOME/guardinha/settings.json`.
@@ -115,7 +117,7 @@ Camadas:
   `src/node.loader.ts`; mudar um alias vale nos quatro.
 - Arquivos no teto de ~500 linhas; passou disso, extraia módulos.
 - `fs` no main fica nos módulos de persistência: `storage.ts` (o `vault.zkv`),
-  `entries-store.ts` (os `.zke`/`.enc`), `auth-store.ts` (os `.zka`), `structure.ts` (as pastas) e
+  `entries-store.ts` (os `.zke`), `auth-store.ts` (os `.zka`), `structure.ts` (as pastas) e
   `shred.ts`. A exceção declarada é o `shred.ts`, que é primitiva de baixo
   nível: recebe sempre um caminho já validado por quem o compôs e não conhece o
   cofre. `layout.ts` não toca `fs`, só resolve caminhos.
@@ -169,11 +171,12 @@ Camadas:
   builder via chave `electronFuses`.
 - Argon2id com custo por método de desbloqueio (PIN de 8 dígitos e PIN de
   pânico: 256 MB / t=4 / p=4; senha mestra e frase de recuperação: 128 MB /
-  t=3 / p=4) e AES-256-GCM por arquivo: mudar parâmetros exige migrar o
-  `vault.zkv` (hoje versão `4`, com o KDF de cada método dentro do container; as
-  versões `2` e `3` ainda são lidas e cada método é reembrulhado com o custo
-  atual no próprio desbloqueio, e isso só é possível para quem tem a credencial)
-  e converter entradas legadas.
+  t=3 / p=4) e AES-256-GCM por arquivo: mudar parâmetros **não** exige migrar o
+  `vault.zkv` (hoje versão `5`, com o KDF de cada método dentro do container),
+  porque cada método é reembrulhado com o custo atual no próprio desbloqueio, e
+  isso só é possível para quem tem a credencial. As chaves derivadas por HKDF
+  usam rótulo de domínio com sufixo `-v1`: trocar o rótulo invalida os arquivos
+  já gravados.
 - PIN de pânico: abre um cofre vazio enquanto aciona o Cryptographic Erase. É
   verificado **antes** da trava exponencial (quem está sob coação não espera
   24 h), não conta tentativa (para não denunciar o segundo caminho) e paga o

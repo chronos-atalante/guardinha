@@ -87,12 +87,16 @@ function fail(error: string): VaultResult {
   return { ok: false, error, status: getStatus() };
 }
 
+/** A mensagem já vem localizada do `storage`; o fallback cobre o erro solto. */
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message !== '' ? error.message : fallback;
+}
+
 /**
- * Migração incremental do custo do Argon2id: reembrulha o método recém-usado
- * com o perfil atual se o gravado for mais fraco. Só quem detém a credencial
- * consegue reembrulhar, então cada método sobe no próprio desbloqueio (um
- * cofre v2 vai a v3 aos poucos). Best-effort: sem permissão de escrita agora a
- * migração espera a próxima desbloqueada, sem derrubar o desbloqueio.
+ * Sobe o custo do Argon2id quando o método gravado está mais fraco que o
+ * perfil atual. Só quem detém a credencial consegue reembrulhar, então cada
+ * método sobe no próprio desbloqueio. Best-effort: sem permissão de escrita
+ * agora, a subida espera a próxima desbloqueada sem derrubar o desbloqueio.
  */
 async function upgradeMethod(
   container: VaultContainerData,
@@ -173,11 +177,9 @@ export async function createVault(input: CreateVaultInput): Promise<VaultResult>
 
   const container: VaultContainerData = {
     createdAt: Date.now(),
-    // informativo (v3+ guarda o custo por método): o perfil mais caro do cofre
-    kdf: keyUnwrapperFor('pin').kdf,
     attempts: 0,
     lockUntil: null,
-    // autodestruição por contagem só com o usuário ligando (item 5.3)
+    // autodestruição por contagem só com o usuário ligando
     attemptsMaster: 0,
     nukeLimit: 0,
     methods,
@@ -235,7 +237,15 @@ async function tryPanicUnlock(input: UnlockInput, container: VaultContainerData)
  */
 export async function unlock(input: UnlockInput): Promise<VaultResult> {
   const m = currentMessages();
-  const container = vaultStorage.readContainer();
+  // Um cofre ilegível (de outra versão, ou danificado) não é erro de
+  // credencial: é o arquivo. Sem este catch a exceção sobe pelo handler do IPC e
+  // o renderer só mostra um `Error occurred in handler`, sem dizer o que houve.
+  let container: VaultContainerData | null;
+  try {
+    container = vaultStorage.readContainer();
+  } catch (error) {
+    return fail(errorMessage(error, m.errors.vaultTampered));
+  }
   if (container === null) return fail(m.errors.vaultMissing);
 
   // antes de tudo, e sem respectar a trava: o PIN de pânico destrói o cofre

@@ -135,7 +135,7 @@ export const en: Messages = {
     modalNew: 'New credential',
     modalEdit: 'Edit credential',
     titleLabel: 'Title',
-    titlePlaceholder: 'Ex.: GitHub',
+    titlePlaceholder: 'Ex.: My Service',
     usernameLabel: 'Username',
     usernamePlaceholder: 'your.username',
     passwordLabel: 'Password',
@@ -160,6 +160,7 @@ export const en: Messages = {
     lengthLabel: 'Password length',
     lengthValue: (n: number): string => `${n} characters`,
     upper: 'Uppercase',
+    lower: 'Lowercase',
     numbers: 'Numbers',
     symbols: 'Symbols',
     entropyTitle: 'Personal entropy injection (5 random taste items)',
@@ -187,7 +188,7 @@ export const en: Messages = {
     tabUri: 'otpauth:// address',
     tabManual: 'Type the key',
     uriLabel: 'Address the site showed',
-    uriPlaceholder: 'otpauth://totp/GitHub:you?secret=…&issuer=GitHub',
+    uriPlaceholder: 'otpauth://totp/MyService:you?secret=…&issuer=MyService',
     uriHint:
       'Paste the whole address, secret included. The secret is encrypted **inside the ' +
       'vault** and never leaves it.',
@@ -198,15 +199,15 @@ export const en: Messages = {
     secretPlaceholder: 'JBSW Y3DP EHPK 3PXP',
     secretHint: 'The key is normalized: uppercase, no spaces and no dashes.',
     issuerLabel: 'Service',
-    issuerPlaceholder: 'GitHub',
+    issuerPlaceholder: 'My Service',
     accountLabel: 'Account',
     accountPlaceholder: 'you@example.com',
     algorithmLabel: 'Algorithm',
     digitsLabel: 'Digits',
     periodLabel: 'Lifetime (seconds)',
     algorithmHint:
-      'The service picks the algorithm, not us. **SHA1** is the default for ' +
-      'GitHub, Discord, Google and most others; SHA256 and SHA512 exist for the few that ask.',
+      'The service picks the algorithm, not us. **SHA1** is the default for most ' +
+      'services; SHA256 and SHA512 exist for the few that ask.',
     deleteConfirm: 'Delete this 2FA token? This cannot be undone.',
     saveError: 'Could not save the token.',
     removeError: 'Could not remove the token.',
@@ -227,10 +228,6 @@ export const en: Messages = {
 
   settings: {
     title: 'Settings',
-    emptyTitle: 'Coming soon',
-    emptyText:
-      'Guardinha settings will be implemented in a future release. ' +
-      'In the meantime, language and vault lock stay in the sidebar.',
     panicTitle: 'Panic PIN',
     panicSubtitle:
       'A second PIN that **opens an empty vault** and wipes the real one. ' +
@@ -285,6 +282,14 @@ export const en: Messages = {
     nukeLimitTooLow: 'The limit is too low to tell apart from a typo.',
     vaultLocked: 'Vault locked: unlock it before accessing credentials.',
     vaultTampered: 'The vault is incomplete or was altered outside the app.',
+    vaultUnsupportedVersion: (version?: number): string =>
+      version === undefined
+        ? 'This vault was created by another version of Guardinha, whose format this ' +
+          'version no longer reads. Nothing was lost: your data is still encrypted on disk. ' +
+          'Open it with the version of the app that created it, or delete the vault folder and create a new one.'
+        : `This vault was created by another version of Guardinha (format v${version}), which this ` +
+          'version no longer reads. Nothing was lost: your data is still encrypted on disk. ' +
+          'Open it with the version of the app that created it, or delete the vault folder and create a new one.',
     vaultDirUnavailable:
       'No permission to write to /var/lib/.guardinha/.vault/. ' +
       'Reinstall the .deb with `sudo dpkg -i` to recreate the folder with the right permissions.',

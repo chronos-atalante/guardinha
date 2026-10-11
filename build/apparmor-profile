@@ -89,12 +89,6 @@ profile ${executable} /opt/${sanitizedProductName}/${executable} {
   owner /var/lib/.guardinha/.vault/   rw,
   owner /var/lib/.guardinha/.vault/** rwkl,
 
-  # Migração dos formatos anteriores (src/main/storage.ts).
-  owner @{HOME}/.local/share/guardinha/   rw,
-  owner @{HOME}/.local/share/guardinha/** rwkl,
-  owner @{HOME}/.guardinha-vault/         rw,
-  owner @{HOME}/.guardinha-vault/**       rwkl,
-
   # ---------- memória compartilhada, terminais e runtime ----------
   /dev/shm/          rw,
   /dev/shm/**        rwkl,

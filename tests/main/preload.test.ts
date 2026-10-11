@@ -142,6 +142,7 @@ describe('preload: canais de credenciais e gerador', () => {
   it('repassa as opções do gerador de senha', async () => {
     const options = {
       length: 24,
+      useLower: true,
       useUpper: true,
       useNumbers: true,
       useSymbols: false,

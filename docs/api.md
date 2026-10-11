@@ -108,9 +108,9 @@ a chave do cofre e com rótulo de domínio HKDF próprio
 
 ## `window.api.generator`
 
-| Método              | Canal                | Payload → retorno           | Descrição                                                                                      |
-| ------------------- | -------------------- | --------------------------- | ---------------------------------------------------------------------------------------------- |
-| `generate(options)` | `generator:generate` | `GeneratorOptions → string` | Senha de 0 a 72 caracteres, com maiúsculas, números, símbolos e entropia pessoal (5 palavras). |
+| Método              | Canal                | Payload → retorno           | Descrição                                                                                                                                                                                     |
+| ------------------- | -------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generate(options)` | `generator:generate` | `GeneratorOptions → string` | Senha de 0 a 72 caracteres, com maiúsculas, minúsculas, números, símbolos e entropia pessoal (5 palavras). O conjunto é só o que está marcado; sem nenhuma categoria marcada, o canal recusa. |
 
 ## `window.api.settings`
 
@@ -129,5 +129,5 @@ a chave do cofre e com rótulo de domínio HKDF próprio
 - `AuthToken`: `{ id, issuer, account, algorithm, digits, period, createdAt, updatedAt }` (sem o segredo)
 - `AuthTokenDraft`: o mesmo mais `secret` em Base32, só na entrada do `save`
 - `AuthCode`: `{ id, code, remainingMs }`
-- `GeneratorOptions`: `{ length, useUpper, useNumbers, useSymbols, customEntropyWords }`
+- `GeneratorOptions`: `{ length, useLower, useUpper, useNumbers, useSymbols, customEntropyWords }`
 - `AppSettings`: `{ language }`

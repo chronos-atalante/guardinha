@@ -70,13 +70,6 @@ fi
 # fica com o usuário instalador (0700) para o app funcionar. Se o instalador
 # não for identificado, o próprio app pede sudo no primeiro uso.
 VAULT_DIR='/var/lib/.guardinha/.vault'
-# layouts visíveis anteriores → ocultos (mv preserva os dados)
-if [ -d /var/lib/guardinha ] && [ ! -d /var/lib/.guardinha ]; then
-  mv /var/lib/guardinha /var/lib/.guardinha
-fi
-if [ -d /var/lib/.guardinha/vault ] && [ ! -d /var/lib/.guardinha/.vault ]; then
-  mv /var/lib/.guardinha/vault /var/lib/.guardinha/.vault
-fi
 install -d -m 0711 -o root -g root '/var/lib/.guardinha'
 VAULT_OWNER_UID="${SUDO_UID:-${PKEXEC_UID:-}}"
 VAULT_OWNER_USER=''

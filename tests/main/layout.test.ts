@@ -2,11 +2,11 @@
 import fs from 'fs-extra';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { vaultDir, entriesDir, legacyVaultDir } from '@zero/main/layout';
+import { vaultDir, entriesDir } from '@zero/main/layout';
 import {
+  ensureVaultStructure,
   isPermissionError,
   isVaultDirUnavailable,
-  migrateHiddenLayout,
   vaultFiles,
   vaultPath,
 } from '@zero/main/structure';
@@ -58,37 +58,18 @@ describe('layout:GUARDINHA_VAULT_DIR sobrepõe o caminho completo', () => {
     process.env.GUARDINHA_VAULT_DIR = '/tmp/cofre-de-teste';
     expect(vaultPath()).toBe(vaultDir());
   });
-
-  it('o cofre legado fica sempre na pasta do usuário', () => {
-    expect(legacyVaultDir()).toBe(path.join(process.env.HOME ?? '', '.guardinha-vault'));
-  });
 });
 
-describe('structure:migração do layout visível para o oculto', () => {
-  it('renomeia entries/ para .entries/ quando só o antigo existe', () => {
-    fs.ensureDirSync(path.join(vaultDir(), 'entries'));
-    fs.writeFileSync(path.join(vaultDir(), 'entries', 'a.zke'), 'x');
+describe('structure:layout do cofre', () => {
+  it('as credenciais só existem em .entries/, nunca em entries/', () => {
+    // não há mais renomeio de layout: um `entries/` visível é de uma versão que
+    // não existe, e o Cryptographic Erase não o apagaria
+    process.env.GUARDINHA_VAULT_DIR = fs.mkdtempSync(path.join(process.env.HOME ?? '/tmp', 'gv-'));
+    ensureVaultStructure();
 
-    migrateHiddenLayout();
-
-    expect(fs.existsSync(path.join(vaultDir(), '.entries', 'a.zke'))).toBe(true);
+    expect(fs.existsSync(entriesDir())).toBe(true);
     expect(fs.existsSync(path.join(vaultDir(), 'entries'))).toBe(false);
-  });
-
-  it('não renomeia quando os dois lados existem (o novo manda)', () => {
-    fs.ensureDirSync(path.join(vaultDir(), 'entries'));
-    fs.ensureDirSync(path.join(vaultDir(), '.entries'));
-    fs.writeFileSync(path.join(vaultDir(), '.entries', 'nova.zke'), 'y');
-
-    migrateHiddenLayout();
-
-    expect(fs.readdirSync(path.join(vaultDir(), '.entries'))).toEqual(['nova.zke']);
-  });
-
-  it('não faz nada quando não existe layout antigo', () => {
-    expect(() => {
-      migrateHiddenLayout();
-    }).not.toThrow();
+    expect(entriesDir()).toBe(path.join(vaultDir(), '.entries'));
   });
 });
 

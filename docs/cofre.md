@@ -35,27 +35,26 @@ Arquivo binário com magic `ZKVAULT1`, escrito e lido apenas em
 truncamento, parâmetro fora da faixa, flag desconhecida ou byte a mais no fim
 devolvem `null` (tratado como adulterado), nunca conteúdo em claro.
 
-Cabeçalho de **53 bytes** na versão 4 (valores em big endian):
+Cabeçalho de **41 bytes**, versão 5 (valores em big endian):
 
-| Offset | Tamanho | Campo                                          |
-| ------ | ------- | ---------------------------------------------- |
-| 0      | 8       | Magic `ZKVAULT1`                               |
-| 8      | 4       | Versão (`4` atual; `3` e `2` ainda legíveis)   |
-| 12     | 8       | `createdAt` (epoch em ms)                      |
-| 20     | 4       | `memoryKiB` do KDF global (informativo em v3+) |
-| 24     | 4       | `iterations` do KDF global                     |
-| 28     | 4       | `parallelism` do KDF global                    |
-| 32     | 4       | Tentativas da trava exponencial                |
-| 36     | 8       | `lockUntil` (epoch em ms; `0` = sem trava)     |
-| 44     | 1       | Máscara de flags do que vem a seguir           |
-| 45     | 4       | `attemptsMaster` (só senha mestra; v4)         |
-| 49     | 4       | `nukeLimit` (0 = desligado; v4)                |
+| Offset | Tamanho | Campo                                      |
+| ------ | ------- | ------------------------------------------ |
+| 0      | 8       | Magic `ZKVAULT1`                           |
+| 8      | 4       | Versão (`5`)                               |
+| 12     | 8       | `createdAt` (epoch em ms)                  |
+| 20     | 4       | Tentativas da trava exponencial            |
+| 24     | 8       | `lockUntil` (epoch em ms; `0` = sem trava) |
+| 32     | 1       | Máscara de flags do que vem a seguir       |
+| 33     | 4       | `attemptsMaster` (só senha mestra)         |
+| 37     | 4       | `nukeLimit` (0 = desligado)                |
 
-O cabeçalho tem tamanho **função da versão**: um arquivo v3 tem 45 bytes e os
-dois campos novos simplesmente não existem nele, então a leitura devolve `0`
-para os dois (autodestruição por contagem nasce desligada num cofre antigo) e
-o cursor dos blobs começa em 45 em vez de 53. É por isso que o tamanho não pode
-ser uma constante só no código.
+O cabeçalho é único e fixo: **não há caminho de leitura para versão anterior**.
+A v4 tinha no meio um tripo de KDF global que era só informativo desde a v3 (cada
+método já carrega o custo do seu Argon2id, e o PIN precisa ser mais caro que a
+senha mestra, então um campo só não representava os dois); a v5 o removeu e ficou
+com 41 bytes. Qualquer versão diferente de `5` é tratada como arquivo
+estranho ou de futuro e devolve `null` (fail-closed). O app ainda não tem
+usuários, então formato anterior não tinha a quem proteger.
 
 Depois do cabeçalho vêm os blocos indicados pelas flags, nesta ordem: chave
 embrulhada da senha mestra, do PIN, da frase de recuperação, do **PIN de
@@ -80,10 +79,11 @@ A leitura só aceita parâmetros dentro de uma faixa fixa (memória de 16 MiB a
 adulterado: a faixa existe para um `vault.zkv` adulterado não conseguir exigir
 memória ou CPU ilimitadas, não como garantia mínima de segurança.
 
-Cofres gravados na versão 2 (KDF único no cabeçalho) continuam legíveis e cada
-método é reembrulhado com o perfil atual **no desbloqueio em que a própria
-credencial dele é usada**. Só quem já tem a credencial consegue fazer isso. A
-versão 3 (cabeçalho de 45 bytes, sem os campos de pânico) segue a mesma regra.
+Um método gravado com um perfil mais barato é reembrulhado com o perfil atual
+**no desbloqueio em que a própria credencial dele é usada**. Só quem já tem a
+credencial consegue fazer isso, e o custo sobe sem nunca derrubar o
+desbloqueio (`upgradeMethod`, em `vault.ts`; best-effort quando falta
+permissão de escrita).
 
 ## Destruição do cofre
 
@@ -96,13 +96,12 @@ gigabytes, é preciso apagar a chave.
 
 1. `vault.zkv` e o `vault.zkv.tmp` (o `.tmp` **contém os mesmos blobs de
    chave**; um órfão de crash seria uma cópia completa do embrulho);
-2. todo arquivo de `.entries/` (`.zke`, `.zke.tmp`, `.enc`);
-3. a pasta `.entries` em si.
+2. todo arquivo de `.entries/` (`.zke`, `.zke.tmp`);
+3. todo arquivo de `.auth/` (`.zka`, `.zka.tmp`);
+4. as pastas `.entries` e `.auth` em si.
 
 Nunca `vaultDir()` nem `.guardinha/`: a raiz é do sistema (`root:root 0711`,
-criada no `postinst`) e o app não é dona dela. Antes de tudo roda
-`migrateHiddenLayout()`, senão um cofre com o layout antigo fica com `entries/`
-de pé e os nomes dos arquivos aparecem em disco.
+criada no `postinst`) e o app não é dona dela.
 
 Cada arquivo passa por `shredFile` (`src/main/shred.ts`): sobrescrita em blocos
 de 64 KiB alternando bytes aleatórios e zeros, terminada em zeros, com
@@ -181,25 +180,21 @@ nada é carregado (`src/main/storage.ts`, `verifyManifest`).
 - Sucesso zera as tentativas; o contador também pode ser zerado por teste ou
   pela redefinição de PIN.
 - Sem atividade por 5 minutos a chave é zerada e o cofre bloqueia
-  (`IDLE_LOCK_MS` em `src/main/vault.ts`). O renderer só percebe na próxima
+  (`IDLE_LOCK_MS` em `src/main/activity.ts`). O renderer só percebe na próxima
   consulta de status (a cada 15 s).
 
 ## Migrações automáticas
 
-Roda em toda leitura (`migrateLegacyVault`), na ordem, e só com os dados no
-lugar:
+Nenhuma. O formato em disco tem uma versão só, o layout de pastas tem um nome
+só e a extensão do payload de credencial tem uma só (`.zke`). O que existiu
+antes (`~/.guardinha-vault` em JSON, o intermediário em `$XDG_DATA_HOME`, o
+layout visível `entries/`, o payload `.enc` e o container v2/v3) foi removido
+com a migration completa: o app ainda não tinha usuário para proteger.
 
-| Origem                              | Destino                | Observação                                     |
-| ----------------------------------- | ---------------------- | ---------------------------------------------- |
-| `$XDG_DATA_HOME/guardinha/vault`    | `/var/lib/.guardinha/` | Cofre binário intermediário                    |
-| `~/.guardinha-vault/` (JSON legado) | `/var/lib/.guardinha/` | `envelope.json`, `entries/`, `auth-state.json` |
-| `.vault/entries/`                   | `.vault/.entries/`     | Layout oculto (rename barato)                  |
-| Container `vault.zkv` versão 2      | versão 3 ou 4          | Reembrulho por método no desbloqueio           |
-| Container `vault.zkv` versão 3      | versão 4               | Cabeçalho de 45 para 53 bytes                  |
-| `.entries/<uuid>.enc` (JSON)        | `.entries/<uuid>.zke`  | Convertido na primeira leitura                 |
-
-Sem permissão de escrita, a migração falha com o erro de pasta indisponível e
-nada é movido; o app não apaga a origem enquanto o destino não estiver certo.
+A única coisa que ainda sobe sozinha é o **custo do Argon2id por método**: um
+cofre gravado com um perfil mais barato é reembrulhado no próximo desbloqueio
+(`upgradeMethod`, em `vault.ts`), porque só quem tem a credencial consegue
+reembrulhar. Isso não muda o formato, é o custo que o serviço merece hoje.
 
 ## Variáveis de ambiente
 
@@ -208,7 +203,6 @@ nada é movido; o app não apaga a origem enquanto o destino não estiver certo.
 | `GUARDINHA_VAULT_DIR` | Caminho completo do diretório do cofre (testes)         |
 | `GUARDINHA_VAR_LIB`   | Troca só a base `/var/lib`                              |
 | `XDG_CONFIG_HOME`     | Onde fica `guardinha/settings.json` (senão `~/.config`) |
-| `XDG_DATA_HOME`       | Onde procura o cofre binário intermediário para migrar  |
 
 Com qualquer uma das duas do cofre, a criação nunca chama `pkexec`. Os
 detalhes de ameaça assumida estão em `SECURITY.md`.

@@ -13,7 +13,7 @@ import type { SaltedPayload } from '@zero/main/crypto';
  * Mesmo desenho de `entries-store.ts` e pelo mesmo motivo: um token por
  * arquivo, para que apagar um não obrigue a reescrever o segredo de todos os
  * outros, e para que a cifragem por registro (salt e IV novos a cada gravação)
- * valha para cada um. O conteúdo decifrado é `{ v, issuer, account, algorithm,
+ * valha para cada um. O conteúdo decifrado é `{ issuer, account, algorithm,
  * digits, period, secret, createdAt, updatedAt }`; o segredo só existe dentro
  * do AES-256-GCM.
  */

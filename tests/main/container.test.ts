@@ -2,7 +2,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   FLAG_PANIC,
-  isLegacyEntryPayload,
   openManifest,
   packEntryPayload,
   packVaultContainer,
@@ -11,21 +10,32 @@ import {
   unpackVaultContainer,
 } from '@zero/main/container';
 import { encryptRecord, randomBytes } from '@zero/main/crypto';
-import type { VaultContainerData, WrappedMethod } from '@zero/main/container';
+import type { VaultContainerData, VaultUnpackResult, WrappedMethod } from '@zero/main/container';
 
-const METHOD_FLAGS_V4 = [0x01, 0x02, 0x04, FLAG_PANIC] as const;
+/**
+ * Formato do container. A v5 é a única suportada: cabeçalho de 41 bytes, sem
+ * tripo global de KDF (cada método carrega o custo do seu Argon2id) e sem
+ * caminho de leitura anterior. Como o app ainda não tem usuários, formato
+ * antigo não tem a quem proteger, e um leitor só da v5 é bem mais difícil de
+ * ler errado do que um que ramifica por versão.
+ */
+
+const HEADER_BYTES = 41;
+const METHOD_FLAGS = [0x01, 0x02, 0x04, FLAG_PANIC] as const;
+
+const KDF_MASTER = { algo: 'argon2id', memoryKiB: 131_072, iterations: 3, parallelism: 4 } as const;
+const KDF_PIN = { algo: 'argon2id', memoryKiB: 262_144, iterations: 4, parallelism: 4 } as const;
 
 function sampleContainer(): VaultContainerData {
   return {
     createdAt: 1_767_268_800_000,
-    kdf: { algo: 'argon2id', memoryKiB: 65536, iterations: 3, parallelism: 4 },
     attempts: 2,
     lockUntil: 1_767_268_810_000,
     attemptsMaster: 1,
     nukeLimit: 0,
     methods: {
       master: {
-        kdf: { algo: 'argon2id', memoryKiB: 131_072, iterations: 3, parallelism: 4 },
+        kdf: KDF_MASTER,
         kdfSalt: 'aa'.repeat(16),
         payload: {
           salt: 'bb'.repeat(16),
@@ -35,7 +45,7 @@ function sampleContainer(): VaultContainerData {
         },
       },
       pin: {
-        kdf: { algo: 'argon2id', memoryKiB: 262_144, iterations: 4, parallelism: 4 },
+        kdf: KDF_PIN,
         kdfSalt: '11'.repeat(16),
         payload: {
           salt: '22'.repeat(16),
@@ -45,7 +55,7 @@ function sampleContainer(): VaultContainerData {
         },
       },
       panic: {
-        kdf: { algo: 'argon2id', memoryKiB: 262_144, iterations: 4, parallelism: 4 },
+        kdf: KDF_PIN,
         kdfSalt: '5a'.repeat(16),
         payload: {
           salt: '6b'.repeat(16),
@@ -55,7 +65,7 @@ function sampleContainer(): VaultContainerData {
         },
       },
       recovery: {
-        kdf: { algo: 'argon2id', memoryKiB: 131_072, iterations: 3, parallelism: 4 },
+        kdf: KDF_MASTER,
         kdfSalt: '1a'.repeat(16),
         payload: {
           salt: '2b'.repeat(16),
@@ -74,177 +84,104 @@ function sampleContainer(): VaultContainerData {
   };
 }
 
-/** Reconstroi um container novo a partir do empacotado, trocando a versão. */
-function withVersion(packed: Buffer, version: number): Buffer {
-  const out = Buffer.from(packed);
-  out.writeUInt32BE(version, 8);
-  return out;
+/** Roundtrip: o resultado cru, com o motivo da recusa quando houver. */
+function roundtrip(data: VaultContainerData): VaultUnpackResult {
+  return unpackVaultContainer(packVaultContainer(data));
 }
 
-/**
- * Reescreve um container v4 no layout v3 (cabeçalho de 45 bytes, sem
- * `attemptsMaster`/`nukeLimit`, sem o método de pânico): é como os cofres v3
- * ficaram em disco.
- */
-function downgradeToV3(packed: Buffer): Buffer {
-  const flags = packed.readUInt8(44) & ~FLAG_PANIC;
-  // v3 e v4 têm o mesmo corpo (KDF por método antes de cada blob); o que muda
-  // é o cabeçalho de 45 bytes e a ausência do método de pânico
-  const parts: Buffer[] = [packed.subarray(0, 45)];
-  let cursor = 53;
-  // master, pin e recovery seguem inteiros; o blob do pânico é descartado
-  for (const flag of [0x01, 0x02, 0x04, FLAG_PANIC]) {
-    if ((packed.readUInt8(44) & flag) === 0) continue;
-    const start = cursor;
-    cursor += 12; // KDF por método
-    const payload = cursor + 16;
-    const end = payload + 52 + packed.readUInt32BE(payload + 48);
-    if ((flags & flag) !== 0) parts.push(packed.subarray(start, end));
-    cursor = end;
-  }
-  // o manifesto (flag 0x08) fica no fim: o cursor já aponta para ele
-  parts.push(packed.subarray(cursor));
-  const v3 = Buffer.concat(parts);
-  v3.writeUInt8(flags, 44);
-  v3.writeUInt32BE(3, 8);
-  return v3;
+/** Os dados de um roundtrip que deu certo; falha o teste se não deu. */
+function packed(data: VaultContainerData): VaultContainerData {
+  const result = roundtrip(data);
+  if (!result.ok) throw new Error(`esperava container válido, veio ${result.reason}`);
+  return result.data;
 }
 
-/** Do v4 para o v2: além do cabeçalho, cada método perde o KDF próprio. */
-function downgradeToV2(packed: Buffer): Buffer {
-  const v3 = downgradeToV3(packed);
-  const flags = v3.readUInt8(44);
-  const parts: Buffer[] = [v3.subarray(0, 45)];
-  let cursor = 45;
-  for (const flag of [0x01, 0x02, 0x04]) {
-    if ((flags & flag) === 0) continue;
-    cursor += 12; // descarta o KDF por método; sobra salt + payload (layout v2)
-    const payload = cursor + 16;
-    const textLength = v3.readUInt32BE(payload + 48);
-    const end = payload + 52 + textLength;
-    parts.push(v3.subarray(cursor, end));
-    cursor = end;
-  }
-  parts.push(v3.subarray(cursor));
-  const v2 = Buffer.concat(parts);
-  v2.writeUInt32BE(2, 8);
-  return v2;
+/** Asserta a recusa e devolve o motivo, para o teste conferir qual foi. */
+function refusal(buffer: Buffer): string {
+  const result = unpackVaultContainer(buffer);
+  if (result.ok) throw new Error('esperava recusa, veio container válido');
+  return result.reason;
 }
 
 describe('container do cofre (vault.zkv)', () => {
   it('roundtrip preserva todos os campos', () => {
     const data = sampleContainer();
-    const restored = unpackVaultContainer(packVaultContainer(data));
-    expect(restored).toEqual(data);
+    const restored = roundtrip(data);
+    expect(restored).toEqual({ ok: true, data });
   });
 
   it('roundtrip sem manifesto e com lockUntil nulo', () => {
     const data: VaultContainerData = { ...sampleContainer(), lockUntil: null, manifest: null };
-    const restored = unpackVaultContainer(packVaultContainer(data));
-    expect(restored).toEqual(data);
+    const restored = roundtrip(data);
+    expect(restored).toEqual({ ok: true, data });
   });
 
-  it('grava na versão 4, com cabeçalho de 53 bytes e o custo por método', () => {
+  it('grava na versão 5, com cabeçalho de 41 bytes e o custo por método', () => {
     const data = sampleContainer();
     const master = data.methods.master;
     const pin = data.methods.pin;
     if (master === undefined || pin === undefined) throw new Error('fixture incompleta');
 
     const packed = packVaultContainer(data);
-    expect(packed.readUInt32BE(8)).toBe(4);
-    // campos novos da v4, logo depois da máscara de flags
-    expect(packed.readUInt32BE(45)).toBe(1); // attemptsMaster
-    expect(packed.readUInt32BE(49)).toBe(0); // nukeLimit desligado por padrão
-    // e o primeiro bloco de método só começa depois dos 53 bytes
-    expect(packed.readUInt32BE(53)).toBe(131_072); // master: 128 MiB
-    expect(packed.readUInt32BE(57)).toBe(3);
-    const pinOffset = 53 + 12 + 16 + 52 + Buffer.from(master.payload.encryptedData, 'hex').length;
+    expect(packed.readUInt32BE(8)).toBe(5);
+    // o cabeçalho inteiro cabe em 41 bytes: não sobrou KDF global no meio
+    expect(packed.readUInt32BE(20)).toBe(2); // attempts
+    expect(packed.readUInt8(32)).toBe(0x1f); // as quatro flags de método + manifesto
+    expect(packed.readUInt32BE(33)).toBe(1); // attemptsMaster
+    expect(packed.readUInt32BE(37)).toBe(0); // nukeLimit desligado por padrão
+    // e o primeiro bloco de método só começa depois dos 41 bytes
+    expect(packed.readUInt32BE(HEADER_BYTES)).toBe(131_072); // master: 128 MiB
+    expect(packed.readUInt32BE(HEADER_BYTES + 4)).toBe(3);
+    const pinOffset =
+      HEADER_BYTES + 12 + 16 + 52 + Buffer.from(master.payload.encryptedData, 'hex').length;
     expect(packed.readUInt32BE(pinOffset)).toBe(262_144); // pin: 256 MiB
     expect(packed.readUInt32BE(pinOffset + 4)).toBe(4);
     expect(pin.kdf.memoryKiB).toBe(262_144);
   });
 
+  it('cada método guarda o seu próprio custo de Argon2id', () => {
+    // o motivo de o tripo global ter saído do cabeçalho: o PIN é 256 MiB e a
+    // senha mestra 128 MiB, e um único campo não representaria os dois
+    const restored = packed(sampleContainer());
+    expect(restored.methods.master?.kdf).toEqual(KDF_MASTER);
+    expect(restored.methods.pin?.kdf).toEqual(KDF_PIN);
+    expect(restored.methods.recovery?.kdf).toEqual(KDF_MASTER);
+  });
+
   it('nukeLimit e attemptsMaster guardam e recuperam o valor gravado', () => {
     const data: VaultContainerData = { ...sampleContainer(), attemptsMaster: 7, nukeLimit: 50 };
-    const restored = unpackVaultContainer(packVaultContainer(data));
-    expect(restored?.attemptsMaster).toBe(7);
-    expect(restored?.nukeLimit).toBe(50);
+    const restored = packed(data);
+    expect(restored.attemptsMaster).toBe(7);
+    expect(restored.nukeLimit).toBe(50);
   });
 
   it('preserva os dois campos com o valor zero (autodestrução desligada)', () => {
     const data: VaultContainerData = { ...sampleContainer(), attemptsMaster: 0, nukeLimit: 0 };
-    const restored = unpackVaultContainer(packVaultContainer(data));
-    expect(restored?.attemptsMaster).toBe(0);
-    expect(restored?.nukeLimit).toBe(0);
+    const restored = packed(data);
+    expect(restored.attemptsMaster).toBe(0);
+    expect(restored.nukeLimit).toBe(0);
   });
 
-  it('grava e lê o método de pânico na v4', () => {
+  it('grava e lê o método de pânico', () => {
     const data = sampleContainer();
     const panic = data.methods.panic;
     if (panic === undefined) throw new Error('fixture incompleta');
-    const restored = unpackVaultContainer(packVaultContainer(data));
-    expect(packVaultContainer(data).readUInt8(44) & FLAG_PANIC).toBe(FLAG_PANIC);
-    expect(restored?.methods.panic?.payload).toEqual(panic.payload);
-    expect(restored?.methods.panic?.kdfSalt).toBe(panic.kdfSalt);
+    const restored = packed(data);
+    expect(packVaultContainer(data).readUInt8(32) & FLAG_PANIC).toBe(FLAG_PANIC);
+    expect(restored.methods.panic?.payload).toEqual(panic.payload);
+    expect(restored.methods.panic?.kdfSalt).toBe(panic.kdfSalt);
   });
 
-  it('lê a versão 3 sem os campos novos, que valem zero', () => {
-    const data = sampleContainer();
-    const legacyBuffer = downgradeToV3(packVaultContainer(data));
-    expect(legacyBuffer.length).toBeLessThan(packVaultContainer(data).length);
-
-    const legacy = unpackVaultContainer(legacyBuffer);
-    expect(legacy).not.toBeNull();
-    if (legacy === null) return;
-    expect(legacy.attempts).toBe(data.attempts);
-    expect(legacy.lockUntil).toBe(data.lockUntil);
-    expect(legacy.methods.master?.kdfSalt).toBe(data.methods.master?.kdfSalt);
-    expect(legacy.methods.pin?.kdfSalt).toBe(data.methods.pin?.kdfSalt);
-    // a v3 não tem como carregar attemptsMaster nem nukeLimit
-    expect(legacy.attemptsMaster).toBe(0);
-    expect(legacy.nukeLimit).toBe(0);
-    expect(legacy.methods.panic).toBeUndefined();
-    expect(legacy.manifest).toEqual(data.manifest);
-
-    // gravar de novo sobe para v4 preservando o conteúdo
-    const upgraded = packVaultContainer(legacy);
-    expect(upgraded.readUInt32BE(8)).toBe(4);
-    expect(unpackVaultContainer(upgraded)?.methods.pin?.payload).toEqual(data.methods.pin?.payload);
-  });
-
-  it('lê a versão 2 herdando o KDF global do cabeçalho', () => {
-    const data = sampleContainer();
-    const pin = data.methods.pin;
-    if (pin === undefined) throw new Error('fixture incompleta');
-
-    const legacy = unpackVaultContainer(downgradeToV2(packVaultContainer(data)));
-    expect(legacy).not.toBeNull();
-    if (legacy === null) return;
-    expect(legacy.kdf).toEqual(data.kdf);
-    expect(legacy.createdAt).toBe(data.createdAt);
-    expect(legacy.manifest).toEqual(data.manifest);
-    expect(legacy.methods.master?.kdf).toEqual(data.kdf);
-    expect(legacy.methods.pin?.kdf).toEqual(data.kdf);
-    expect(legacy.methods.pin?.kdfSalt).toBe(pin.kdfSalt);
-    expect(legacy.methods.pin?.payload).toEqual(pin.payload);
-    // gravar de novo sobe para v4 com o custo correto de cada método
-    expect(packVaultContainer(legacy).readUInt32BE(8)).toBe(4);
-  });
-
-  it('recusa parâmetro KDF fora da faixa (cabeçalho ou método)', () => {
+  it('recusa parâmetro KDF de método fora da faixa', () => {
     const packed = packVaultContainer(sampleContainer());
 
-    const hugeHeader = Buffer.from(packed);
-    hugeHeader.writeUInt32BE(4_294_967_295, 20);
-    expect(unpackVaultContainer(hugeHeader)).toBeNull();
-
     const hugeMethod = Buffer.from(packed);
-    hugeMethod.writeUInt32BE(4_294_967_295, 53);
-    expect(unpackVaultContainer(hugeMethod)).toBeNull();
+    hugeMethod.writeUInt32BE(4_294_967_295, HEADER_BYTES);
+    expect(refusal(hugeMethod)).toBe('damaged');
 
     const zeroIterations = Buffer.from(packed);
-    zeroIterations.writeUInt32BE(0, 57);
-    expect(unpackVaultContainer(zeroIterations)).toBeNull();
+    zeroIterations.writeUInt32BE(0, HEADER_BYTES + 4);
+    expect(refusal(zeroIterations)).toBe('damaged');
   });
 
   it('recusa gravar parâmetro KDF fora da faixa', () => {
@@ -263,40 +200,66 @@ describe('container do cofre (vault.zkv)', () => {
 
     const badMagic = Buffer.from(packed);
     badMagic.write('XXXXXXXX', 0, 'ascii');
-    expect(unpackVaultContainer(badMagic)).toBeNull();
+    expect(refusal(badMagic)).toBe('damaged');
 
-    const badVersion = withVersion(packed, 99);
-    expect(unpackVaultContainer(badVersion)).toBeNull();
+    // v4 (o layout anterior) não é lido: formato velho é arquivo desconhecido
+    const oldVersion = Buffer.from(packed);
+    oldVersion.writeUInt32BE(4, 8);
+    expect(refusal(oldVersion)).toBe('unsupported-version');
 
-    expect(unpackVaultContainer(Buffer.concat([packed, Buffer.from([0])]))).toBeNull();
+    const futureVersion = Buffer.from(packed);
+    futureVersion.writeUInt32BE(99, 8);
+    expect(refusal(futureVersion)).toBe('unsupported-version');
+
+    expect(refusal(Buffer.concat([packed, Buffer.from([0])]))).toBe('damaged');
+  });
+
+  it('distingue cofre de outra versão de arquivo danificado', () => {
+    // o motivo importa na tela: um cofre de outra versão está inteiro e cifrado,
+    // e dizer "alterado fora do app" faz o usuário achar que perdeu os dados
+    const packedBytes = packVaultContainer(sampleContainer());
+
+    const otherVersion = Buffer.from(packedBytes);
+    otherVersion.writeUInt32BE(4, 8);
+    expect(unpackVaultContainer(otherVersion)).toEqual({
+      ok: false,
+      reason: 'unsupported-version',
+      version: 4,
+    });
+
+    // arquivo que nem é cofre continua sendo "danificado"
+    const notAVault = Buffer.from(packedBytes);
+    notAVault.write('XXXXXXXX', 0, 'ascii');
+    expect(refusal(notAVault)).toBe('damaged');
   });
 
   it('recusa flag desconhecida, para um arquivo corrompido não entrar', () => {
     const packed = packVaultContainer(sampleContainer());
     const unknownFlag = Buffer.from(packed);
-    unknownFlag.writeUInt8(unknownFlag.readUInt8(44) | 0x80, 44);
-    expect(unpackVaultContainer(unknownFlag)).toBeNull();
+    unknownFlag.writeUInt8(unknownFlag.readUInt8(32) | 0x80, 32);
+    expect(refusal(unknownFlag)).toBe('damaged');
   });
 
   it('recusa truncamento e byte adulterado no cabeçalho', () => {
     const packed = packVaultContainer(sampleContainer());
-    expect(unpackVaultContainer(packed.subarray(0, packed.length - 3))).toBeNull();
+    expect(refusal(packed.subarray(0, packed.length - 3))).toBe('damaged');
 
     const flipped = Buffer.from(packed);
     flipped.writeUInt32BE(0, 0); // quebra a mágica
-    expect(unpackVaultContainer(flipped)).toBeNull();
+    expect(refusal(flipped)).toBe('damaged');
   });
 
-  it('recusa um header da v4 cortado no meio dos campos novos', () => {
+  it('recusa um cabeçalho cortado no meio dos campos', () => {
     const packed = packVaultContainer(sampleContainer());
-    // cabeçalho de 45 bytes declarado como v4: os 8 bytes dos campos faltam
-    expect(unpackVaultContainer(packed.subarray(0, 45))).toBeNull();
+    // 41 bytes declarados como v5, mas sem os 8 bytes finais do cabeçalho
+    expect(refusal(packed.subarray(0, HEADER_BYTES - 4))).toBe('damaged');
+    expect(refusal(packed.subarray(0, 8))).toBe('damaged');
   });
 
   it('recusa container sem nenhum método de desbloqueio', () => {
     const data = sampleContainer();
     data.methods = {};
-    expect(unpackVaultContainer(packVaultContainer(data))).toBeNull();
+    expect(roundtrip(data)).toEqual({ ok: false, reason: 'damaged' });
   });
 
   it('recusa container só com o método de pânico (ninguém abriria)', () => {
@@ -304,14 +267,13 @@ describe('container do cofre (vault.zkv)', () => {
     const panic = data.methods.panic;
     if (panic === undefined) throw new Error('fixture incompleta');
     data.methods = { panic };
-    expect(unpackVaultContainer(packVaultContainer(data))).toBeNull();
+    expect(roundtrip(data)).toEqual({ ok: false, reason: 'damaged' });
   });
 
   it('mantém o roundtrip de todas as flags conhecidas ligadas', () => {
-    const data = sampleContainer();
-    const packed = packVaultContainer(data);
-    for (const flag of METHOD_FLAGS_V4) {
-      expect(packed.readUInt8(44) & flag).toBe(flag);
+    const packed = packVaultContainer(sampleContainer());
+    for (const flag of METHOD_FLAGS) {
+      expect(packed.readUInt8(32) & flag).toBe(flag);
     }
   });
 });
@@ -342,18 +304,9 @@ describe('payload de entrada (.zke)', () => {
     expect(unpackEntryPayload(badMagic)).toBeNull();
   });
 
-  it('detecta payload legado em JSON', () => {
-    expect(isLegacyEntryPayload(Buffer.from('{"salt":"aa"}', 'utf8'))).toBe(true);
-    expect(
-      isLegacyEntryPayload(
-        packEntryPayload({
-          salt: 'aa'.repeat(16),
-          iv: 'bb'.repeat(16),
-          tag: 'cc'.repeat(16),
-          encryptedData: '00',
-        }),
-      ),
-    ).toBe(false);
+  it('recusa payload em JSON, que era o layout antigo', () => {
+    // o `.enc` em JSON não existe mais: um arquivo assim não é uma credencial
+    expect(unpackEntryPayload(Buffer.from('{"salt":"aa"}', 'utf8'))).toBeNull();
   });
 });
 
@@ -369,16 +322,18 @@ describe('manifesto de integridade', () => {
     });
   });
 
-  it('manifesto da v1 (só credenciais) abre com a lista de tokens vazia', () => {
-    const key = randomBytes(32);
-    const legacy = encryptRecord({ v: 1, ids: IDS }, key);
-    expect(openManifest(key, legacy)).toEqual({ ids: IDS, authIds: [] });
-  });
-
   it('falha com a chave errada', () => {
     const key = randomBytes(32);
     const blob = sealManifest(key, IDS, []);
     expect(() => openManifest(randomBytes(32), blob)).toThrow();
+  });
+
+  it('recusa a versão anterior do manifesto', () => {
+    // o `v` mora dentro do blob cifrado, então trocar a versão do manifesto não
+    // muda o container: um manifesto velho é recusado, não adivinhado
+    const key = randomBytes(32);
+    const old = encryptRecord({ v: 1, ids: IDS }, key);
+    expect(() => openManifest(key, old)).toThrow();
   });
 
   it('falha com forma inesperada (fail-closed)', () => {

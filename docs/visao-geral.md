@@ -74,8 +74,9 @@ não entra no pacote.
   **só** para redefinir o PIN esquecido, nunca para desbloquear.
 - **Chave do cofre**: segredo de 32 bytes em memória do processo main; embrulhado
   no `vault.zkv` e zerado no bloqueio.
-- **`vault.zkv`**: arquivo único com as chaves embrulhadas por método, a trava
-  exponencial, o manifesto cifrado e os parâmetros do KDF (versão 3).
+- **`vault.zkv`**: arquivo único com as chaves embrulhadas por método (cada uma
+  com o custo de Argon2id do seu método), a trava exponencial, o limite de
+  autodestruição e o manifesto cifrado (versão 5).
 - **`.zke`**: arquivo cifrado de uma credencial salva, com salt e IV próprios.
 - **Argon2id (KDF)**: função de derivação que torna cada tentativa de adivinhação
   cara em CPU e memória; o custo varia por método (`cofre.md`).

@@ -51,6 +51,7 @@ export const app = {
   getName: vi.fn<() => string>(() => 'guardinha'),
   commandLine: {
     appendSwitch: vi.fn<(name: string, value?: string) => void>(),
+    hasSwitch: vi.fn<(name: string) => boolean>(() => false),
   },
   name: 'Guardinha',
   // Propriedade booleana, como no Electron real (não função).

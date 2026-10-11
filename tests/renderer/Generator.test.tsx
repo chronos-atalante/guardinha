@@ -23,14 +23,14 @@ function open(): ReturnType<typeof vi.fn> {
 }
 
 describe('Generator', () => {
-  it('abre com o tamanho padrão e as três categorias ligadas', () => {
+  it('abre com o tamanho padrão e as quatro categorias ligadas', () => {
     open();
     expect(screen.getByText('24 caracteres')).toBeInTheDocument();
     expect(screen.getByRole('slider', { name: 'Tamanho da Senha' })).toHaveAttribute(
       'aria-valuenow',
       '24',
     );
-    for (const label of ['Maiúsculas', 'Números', 'Símbolos']) {
+    for (const label of ['Maiúsculas', 'Minúsculas', 'Números', 'Símbolos']) {
       expect(screen.getByRole('checkbox', { name: label })).toBeChecked();
     }
   });
@@ -46,6 +46,7 @@ describe('Generator', () => {
 
     expect(generate).toHaveBeenCalledWith({
       length: 24,
+      useLower: true,
       useUpper: true,
       useNumbers: true,
       useSymbols: true,
@@ -73,6 +74,42 @@ describe('Generator', () => {
         customEntropyWords: ['fone', '2001', '', '', ''],
       }),
     );
+  });
+
+  it('só com maiúsculas marcadas pede senha sem as outras categorias', async () => {
+    const user = userEvent.setup();
+    const api = installApi();
+    const generate = vi.fn().mockResolvedValue('X');
+    api.generator.generate = generate;
+    open();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Minúsculas' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Números' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Símbolos' }));
+    await user.click(screen.getByRole('button', { name: /Gerar Senha Criptográfica/ }));
+
+    expect(generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        useUpper: true,
+        useLower: false,
+        useNumbers: false,
+        useSymbols: false,
+      }),
+    );
+  });
+
+  it('não deixa desligar a última categoria, que deixaria o gerador sem conjunto', async () => {
+    const user = userEvent.setup();
+    open();
+
+    for (const label of ['Minúsculas', 'Números', 'Símbolos']) {
+      await user.click(screen.getByRole('checkbox', { name: label }));
+    }
+
+    // só "Maiúsculas" sobrou, e ela continua ligada: sem conjunto não há senha
+    expect(screen.getByRole('checkbox', { name: 'Maiúsculas' })).toBeChecked();
+    await user.click(screen.getByRole('checkbox', { name: 'Maiúsculas' }));
+    expect(screen.getByRole('checkbox', { name: 'Maiúsculas' })).toBeChecked();
   });
 
   it('muda o tamanho pelo slider', async () => {

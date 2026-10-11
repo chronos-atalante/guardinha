@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { Copy, KeyRound, Plus, Trash2 } from 'lucide-react';
-import { useMessages } from '@zero/renderer/i18n';
+import { richText, useMessages } from '@zero/renderer/i18n';
 import { copyAndAutoClear } from '@zero/renderer/clipboard';
 import { AuthTokenModal } from '@zero/renderer/components/AuthTokenModal';
 import type { AuthCode, AuthToken } from '@zero/types';
@@ -141,7 +141,9 @@ export function Authenticator({ onToast }: AuthenticatorProps): JSX.Element {
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center space-y-2">
           <KeyRound className="w-8 h-8 text-slate-600 mx-auto" />
           <p className="text-sm font-medium text-slate-300">{m.authenticator.emptyTitle}</p>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">{m.authenticator.emptyText}</p>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            {richText(m.authenticator.emptyText)}
+          </p>
         </div>
       ) : (
         <ul className="space-y-3">

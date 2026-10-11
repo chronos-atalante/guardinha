@@ -19,7 +19,7 @@ import path from 'node:path';
  * pode acabar em outro bloco físico e o original sobrar no controle do
  * controlador. Por isso o Cryptographic Erase (apagar a chave embrulhada) é a
  * estratégia primária, e o shred aqui é higiene. O detalhamento está em
- * `SECURITY.md`, `docs/cofre.md` e no roadmap (`CHECKLIST.md`, Ponto 3).
+ * `SECURITY.md` e `docs/cofre.md`.
  */
 
 /** Passadas por padrão: 3 é o padrão do `shred(1)` e o suficiente aqui. */

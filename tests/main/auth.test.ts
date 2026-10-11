@@ -24,7 +24,6 @@ const EMPTY_STATE = { attempts: 0, lockUntil: null, attemptsMaster: 0, nukeLimit
 function seedContainer(): void {
   writeVaultContainer({
     createdAt: BASE,
-    kdf: { algo: 'argon2id', memoryKiB: 65536, iterations: 3, parallelism: 4 },
     attempts: 0,
     lockUntil: null,
     attemptsMaster: 0,

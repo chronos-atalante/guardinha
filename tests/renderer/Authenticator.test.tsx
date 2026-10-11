@@ -499,8 +499,78 @@ describe('modal de token', () => {
 
     await user.click(screen.getByRole('button', { name: 'Digitar a chave' }));
 
+    // o campo é o listbox do app, então as opções só existem com o menu aberto
+    await user.click(screen.getByRole('button', { name: 'Algoritmo' }));
+
     expect(screen.getByRole('option', { name: 'SHA1' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'SHA256' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'SHA512' })).toBeInTheDocument();
+  });
+
+  /**
+   * As dicas usam os marcadores `**negrito**` e `` `código` ``, e saem por
+   * `richText`. Renderizadas como texto puro elas mostravam os asteriscos e as
+   * crases para o usuário, então o teste olha os elementos, não a string.
+   */
+  describe('marcadores ricos nas dicas', () => {
+    it('destaque e código viram elementos na aba do endereço', () => {
+      render(
+        <MessagesProvider language="pt-BR">
+          <AuthTokenModal
+            token={null}
+            onClose={() => undefined}
+            onSaved={() => undefined}
+            onError={() => undefined}
+          />
+        </MessagesProvider>,
+      );
+
+      expect(screen.getByText('dentro do cofre', { selector: 'strong' })).toBeInTheDocument();
+      expect(screen.queryByText(/\*\*/)).not.toBeInTheDocument();
+    });
+
+    it('destaque e código viram elementos na aba dos campos', async () => {
+      const user = userEvent.setup();
+      render(
+        <MessagesProvider language="pt-BR">
+          <AuthTokenModal
+            token={null}
+            onClose={() => undefined}
+            onSaved={() => undefined}
+            onError={() => undefined}
+          />
+        </MessagesProvider>,
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Digitar a chave' }));
+
+      // "SHA1" também é o valor que o campo do algoritmo mostra, daí o selector
+      expect(screen.getByText('SHA1', { selector: 'strong' })).toBeInTheDocument();
+      expect(screen.queryByText(/\*\*/)).not.toBeInTheDocument();
+    });
+
+    it('o aviso de endereço inválido também formata o trecho de código', async () => {
+      const user = userEvent.setup();
+      installApi();
+      render(
+        <MessagesProvider language="pt-BR">
+          <AuthTokenModal
+            token={null}
+            onClose={() => undefined}
+            onSaved={() => undefined}
+            onError={() => undefined}
+          />
+        </MessagesProvider>,
+      );
+
+      await user.type(screen.getByRole('textbox'), 'otpauth://totp/GitHub:eu');
+
+      expect(await screen.findByText('otpauth://totp/', { selector: 'code' })).toBeInTheDocument();
+    });
+
+    it('o estado vazio do 2FA formata o endereço', async () => {
+      renderScreen([]);
+      expect(await screen.findByText('otpauth://', { selector: 'code' })).toBeInTheDocument();
+    });
   });
 });

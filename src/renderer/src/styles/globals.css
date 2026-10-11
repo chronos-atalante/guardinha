@@ -1,11 +1,34 @@
 @import 'tailwindcss';
 
+/*
+ * Fallback de fonte CJK. Os bundles `zh-CN`, `ko` e `ja` só aparecem com hanzi e
+ * hangul; numa instalação sem fonte CJK (o `fonts-noto-cjk` não vem por padrão
+ * em toda distro) esses caracteres sairiam como quadradinhos vazios. O
+ * `system-ui` do Electron resolve sozinho quando existe fonte instalada, então
+ * esta pilha só entra como plano B. Ordem: Noto (o pacote mais comum no Linux),
+ * Source Han (o mesmo desenho com outro nome) e, por último, o genérico
+ * `sans-serif`, que sempre devolve alguma coisa legível.
+ */
+:root {
+  --font-cjk:
+    'Noto Sans CJK SC', 'Noto Sans CJK TC', 'Noto Sans CJK JP', 'Noto Sans CJK KR', 'Noto Sans KR',
+    'Noto Sans JP', 'Noto Sans SC', 'Source Han Sans SC', 'Source Han Sans KR',
+    'Source Han Sans JP', 'WenQuanYi Zen Hei', 'Microsoft YaHei', 'Malgun Gothic', 'Hiragino Sans',
+    'Yu Gothic', 'PingFang SC', 'sans-serif';
+}
+
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
-  background-color: #020617;
+  background-color: #000;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    var(--font-cjk);
 }
 
 /* Scrollbar discreta no estilo da UI */

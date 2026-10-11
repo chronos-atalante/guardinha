@@ -2,7 +2,8 @@ import fs from 'fs-extra';
 import { authDir, containerFile, entriesDir } from '@zero/main/layout';
 import { markVaultDestroyed } from '@zero/main/erasure-state';
 import { SHRED_PASSES, shredDirectory, shredFile } from '@zero/main/shred';
-import { migrateHiddenLayout, vaultFiles } from '@zero/main/structure';
+import { vaultFiles } from '@zero/main/structure';
+import type { EraseResult } from '@zero/types';
 
 /**
  * Cryptographic Erase: a autodestruição do cofre.
@@ -20,7 +21,7 @@ import { migrateHiddenLayout, vaultFiles } from '@zero/main/structure';
  * 1. `vault.zkv` e o seu `.tmp` (cópia temporária que **contém os mesmos
  *    blobs de chave**; um órfão de crash seria uma cópia completa do
  *    embrulho);
- * 2. todo arquivo de credencial (`.zke`, `.zke.tmp`, `.enc`), por shred;
+ * 2. todo arquivo de credencial (`.zke`, `.zke.tmp`), por shred;
  * 3. todo arquivo de token de 2FA (`.zka`, `.zka.tmp`), por shred;
  * 4. as pastas `.entries` e `.auth` em si;
  *
@@ -31,20 +32,10 @@ import { migrateHiddenLayout, vaultFiles } from '@zero/main/structure';
  * segredo TOTP de uma conta vale tanto quanto a senha dela. Deixar `.auth` de
  * pé num Cryptographic Erase seria apagar a fechadura e deixar a chave na
  * parede.
- *
- * `migrateHiddenLayout()` roda antes, senão um cofre com o layout antigo fica
- * com `entries/` de pé e os nomes dos arquivos aparecem em disco.
  */
-
-/** Resultado do erase, só para diagnóstico: quantos arquivos caíram e quantos resistiram. */
-export interface EraseResult {
-  shredded: number;
-  failed: number;
-}
 
 /** O erase é idempotente: chamar de novo devolve zero sem erro. */
 export function eraseVault(): EraseResult {
-  migrateHiddenLayout();
   let shredded = 0;
   let failed = 0;
 

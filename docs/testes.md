@@ -20,7 +20,7 @@ auditoria de dependências e shellcheck. Rode os dois antes de concluir.
 | Arquivo                                | O que cobre                                                                                                                                      |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `tests/main/auth.test.ts`              | Escala da trava (10 s até 24 h), validações de formato e os contadores por método (`attemptsMaster` só conta senha mestra)                       |
-| `tests/main/container.test.ts`         | Formato do `vault.zkv` e `.zke`: roundtrip v4, leitura de v3 e v2, header de 53 bytes, `nukeLimit`, flag desconhecida                            |
+| `tests/main/container.test.ts`         | Formato do `vault.zkv` e `.zke`: roundtrip da v5, header de 41 bytes, custo por método, recusa de versão antiga, flag desconhecida               |
 | `tests/main/crypto.test.ts`            | Argon2id, perfis de custo, AES-256-GCM, gerador e frase                                                                                          |
 | `tests/main/storage.test.ts`           | Migrações (JSON legado, XDG, layout oculto), permissões e uuid seguro                                                                            |
 | `tests/main/facade.test.ts`            | Fachada de persistência: roundtrip de credencial, forma inválida e arquivo injetado                                                              |
