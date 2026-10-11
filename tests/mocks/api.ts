@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import type { AuthToken, ElectronApi, PanicStatus, VaultStatus } from '@zero/types';
 
 export const UNLOCKED: VaultStatus = {
@@ -20,6 +21,16 @@ export const NO_PANIC: PanicStatus = { hasPanicPin: false, nukeLimit: 0, attempt
  * Os testes que precisam observar um canal sobrescrevem o campo depois de
  * chamar este helper.
  */
+/**
+ * Ouvintes que o renderer registrou em `vault.onAutoLocked`. O mock precisa
+ * guardá-los para que o teste consiga disparar o push que o main faria no auto
+ * lock, que é o caminho que tira a tela do cofre antes do polling de 15 s.
+ */
+export const autoLockedListeners: ((status: VaultStatus) => void)[] = [];
+
+/** Espia a chamada de cancelamento feita pelo renderer no cleanup do efeito. */
+export const unsubscribeAutoLock = vi.fn<() => void>();
+
 export function installApi(
   overrides: {
     status?: VaultStatus;
@@ -32,6 +43,8 @@ export function installApi(
   const unused = (): Promise<never> => Promise.reject(new Error('não usado neste teste'));
   const status = overrides.status ?? UNLOCKED;
   const entries = overrides.entries ?? [];
+  autoLockedListeners.length = 0;
+  unsubscribeAutoLock.mockClear();
   const api: ElectronApi = {
     vault: {
       status: () => Promise.resolve(status),
@@ -44,9 +57,10 @@ export function installApi(
       clearPanicPin: () => Promise.resolve(status),
       setNukeLimit: () => Promise.resolve({ ok: false, error: 'não usado', status }),
       panicStatus: () => Promise.resolve(overrides.panic ?? NO_PANIC),
-      onAutoLocked: () => () => {
-        // auto-lock não é exercitado no renderer
-      },
+      onAutoLocked: vi.fn((listener: (status: VaultStatus) => void) => {
+        autoLockedListeners.push(listener);
+        return unsubscribeAutoLock;
+      }),
     },
     openDomain: unused,
     clipboard: { copy: () => Promise.resolve() },

@@ -17,7 +17,12 @@ jobs:
     if: >-
       github.event.pull_request.merged == true &&
       github.event.pull_request.user.type != 'Bot'
-    runs-on: ubuntu-latest
+    # Runner fixado, não `ubuntu-latest`: em 19/10/2026 o rótulo `ubuntu-latest`
+    # do GitHub passa a apontar para Ubuntu 26.04 (actions/runner-images#14748).
+    # O `.deb` da build-deb é o artefato que o usuário instala, e trocar a imagem
+    # no meio da linha 1.x mudaria o ambiente de build sem decisão nenhuma.
+    # Como sair do 24.04 está em `docs/build.md`.
+    runs-on: ubuntu-24.04
     steps:
       - name: Comentar agradecimento
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7

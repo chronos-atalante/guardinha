@@ -1,0 +1,143 @@
+name: Qualidade
+
+# Gate de qualidade da branch de trabalho. O `publish.yml` só roda na `main`,
+# no momento em que a versão sai: sem este arquivo, um push na `developer`
+# com erro de tipo, formatação quebrada, dependência vulnerável ou teste
+# vermelho só seria descoberto depois de mesclar.
+#
+# Gatilhos:
+# - push na `developer`: a série de commits é conferida enquanto ela cresce;
+# - pull_request para `main` e `developer`: é a verificação que precisa estar
+#   verde para o merge acontecer;
+# - workflow_dispatch: para rodar na mão quando um passo local ficou duvidoso.
+#
+# A porta de 90% de cobertura mora em `vitest.config.mts` (`thresholds`), não
+# aqui: assim o número é o mesmo para quem roda localmente e para o CI, e
+# `npm run test:coverage` sozinho já reprova abaixo da meta.
+#
+# Para o merge ficar realmente travado, marque "Testes e cobertura" e
+# "Verificar qualidade" como status checks obrigatórios nas regras de proteção
+# da `main` (Settings > Branches > Branch protection rules).
+#
+# Actions fixadas por SHA completo (com a tag na comentário) para não depender
+# da segurança da tag movível; o Dependabot (`github-actions`) atualiza os pins.
+
+on:
+  push:
+    branches:
+      - developer
+  pull_request:
+    branches:
+      - main
+      - developer
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Push seguido de outro push na mesma branch: cancela a corrida velha, que já
+# não interessa. Pull request nunca é cancelado, para o status não ficar
+# indefinido enquanto o autor corrige.
+concurrency:
+  group: qualidade-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  qualidade:
+    name: Verificar qualidade
+    # Runner fixado, não `ubuntu-latest`: em 19/10/2026 o rótulo `ubuntu-latest`
+    # do GitHub passa a apontar para Ubuntu 26.04 (actions/runner-images#14748).
+    # O `.deb` da build-deb é o artefato que o usuário instala, e trocar a imagem
+    # no meio da linha 1.x mudaria o ambiente de build sem decisão nenhuma.
+    # Como sair do 24.04 está em `docs/build.md`.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Ferramentas de auditoria (binários fora do git; versões fixadas)
+        run: |
+          set -euo pipefail
+          # `bin/osv-scanner` e `bin/shellcheck` são gitignored (ver
+          # `.gitignore`): a pasta não existe no checkout do CI e o curl
+          # falharia com exit 23 (não consegue criar o arquivo). `mkdir -p`
+          # antes. Mesmas versões do `publish.yml` e de `docs/build.md`.
+          mkdir -p bin
+          curl -fsSL -o bin/osv-scanner \
+            https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
+          curl -fsSL -o /tmp/shellcheck.tar.xz \
+            https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz
+          chmod +x bin/osv-scanner
+          # O tarball tem shellcheck-v0.11.0/shellcheck; `--strip-components=1`
+          # joga o diretório fora e o tarball vai para /tmp (fora da pasta que
+          # o `npm run check` lê, para não sobrar lixo no workspace).
+          tar -xJf /tmp/shellcheck.tar.xz --strip-components=1 -C bin shellcheck-v0.11.0/shellcheck
+          rm -f /tmp/shellcheck.tar.xz
+          bin/osv-scanner --version
+          bin/shellcheck --version | head -2
+
+      - name: Typecheck + lint + formato + auditoria OSV + shellcheck
+        run: npm run check
+
+  cobertura:
+    name: Testes e cobertura
+    # Runner fixado, não `ubuntu-latest`: em 19/10/2026 o rótulo `ubuntu-latest`
+    # do GitHub passa a apontar para Ubuntu 26.04 (actions/runner-images#14748).
+    # O `.deb` da build-deb é o artefato que o usuário instala, e trocar a imagem
+    # no meio da linha 1.x mudaria o ambiente de build sem decisão nenhuma.
+    # Como sair do 24.04 está em `docs/build.md`.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # `json-summary` entra como reporter extra (o `text` e o `html` já são o
+      # padrão do `vitest.config.mts`): é dele que sai a tabela do resumo da
+      # execução, com o mesmo número que o gate de 90% aplicou.
+      - name: Testes com cobertura
+        run: npm run test:coverage -- --coverage.reporter=json-summary
+
+      - name: Resumo da cobertura na página da execução
+        if: always()
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("node:fs");
+            const file = "coverage/coverage-summary.json";
+            if (!fs.existsSync(file)) process.exit(0);
+            const s = JSON.parse(fs.readFileSync(file, "utf8"));
+            const meta = s.total;
+            const cell = (m) => meta[m].pct.toFixed(2) + "%";
+            const rows = [
+              "## Cobertura",
+              "",
+              "| Linhas | Ramos | Funções | Comandos |",
+              "| --- | --- | --- | --- |",
+              "| " + cell("lines") + " | " + cell("branches") + " | " + cell("functions")
+                + " | " + cell("statements") + " |",
+              "",
+              "Meta: 90% nos quatro (definida em `vitest.config.mts`).",
+            ];
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, rows.join("\n") + "\n");
+          '
+
+      - name: Relatório HTML da cobertura
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cobertura-relatorio
+          path: coverage/
+          retention-days: 14
+          if-no-files-found: ignore
