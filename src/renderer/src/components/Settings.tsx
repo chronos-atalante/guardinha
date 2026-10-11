@@ -219,7 +219,11 @@ export function Settings(): JSX.Element {
             <p className="text-sm text-amber-300">
               {m.settings.nukeConfirmText(panic?.nukeLimit ?? 0)}
             </p>
+            <label htmlFor="nuke-limit-confirm" className="block text-sm text-slate-300 mb-1">
+              {m.settings.nukeConfirmLabel}
+            </label>
             <input
+              id="nuke-limit-confirm"
               type="text"
               inputMode="numeric"
               autoComplete="off"
@@ -252,7 +256,11 @@ export function Settings(): JSX.Element {
           </div>
         ) : (
           <div className="space-y-3">
+            <label htmlFor="nuke-limit" className="block text-sm text-slate-300 mb-1">
+              {m.settings.nukeLabel}
+            </label>
             <input
+              id="nuke-limit"
               type="text"
               inputMode="numeric"
               max={MAX_LIMIT_INPUT}

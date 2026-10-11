@@ -37,12 +37,11 @@ function first(elements: HTMLElement[]): HTMLElement {
 
 /**
  * O campo do limite é o único `input[type=text]` da tela (os de PIN são
- * `password`, que não têm papel de textbox), então o papel o identifica sem
- * depender de rótulo. Vale registrar: ele não tem nome acessível nenhum, nem
- * placeholder, o que é uma lacuna de acessibilidade da tela, não do teste.
+ * `password`, que não têm papel de textbox). Agora ele também tem rótulo
+ * visível, então os testes usam `getByLabelText` e o papel fica de reserva.
  */
 function limitField(): HTMLElement {
-  return screen.getByRole('textbox');
+  return screen.getByLabelText('Digite o limite para confirmar');
 }
 
 describe('Configurações: autodestruição por tentativas', () => {
@@ -96,9 +95,10 @@ describe('Configurações: autodestruição por tentativas', () => {
 
     expect(setNuke).not.toHaveBeenCalled();
     // o texto de confirmação some e o valor digitado é descartado, para a
-    // próxima tentativa não herdar um limite pela metade
+    // próxima tentativa não herdar um limite pela metade; o campo volta a ser
+    // o de escolha do limite, com o outro rótulo
     expect(screen.queryByText(/Ao atingir/)).not.toBeInTheDocument();
-    expect(limitField()).toHaveValue('');
+    expect(screen.getByLabelText('Limite de tentativas da senha mestra')).toHaveValue('');
   });
 
   it('mostra o limite atual e oferece desligar quando está ativo', async () => {

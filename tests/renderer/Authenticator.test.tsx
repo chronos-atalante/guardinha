@@ -337,6 +337,74 @@ describe('modal de token', () => {
     expect(saved).not.toHaveBeenCalled();
   });
 
+  it('avisa na hora que o endereço colado não serve', async () => {
+    // antes só descobria o erro no botão "Salvar"; colar metade do endereço e
+    // esperar era o único jeito de perceber que faltava o segredo
+    const user = userEvent.setup();
+    installApi();
+    render(
+      <MessagesProvider language="pt-BR">
+        <AuthTokenModal
+          token={null}
+          onClose={() => undefined}
+          onSaved={() => undefined}
+          onError={() => undefined}
+        />
+      </MessagesProvider>,
+    );
+
+    const field = screen.getByRole('textbox');
+    await user.type(field, 'otpauth://totp/GitHub:eu');
+
+    expect(await screen.findByText(/Endereço inválido ou sem segredo/)).toBeInTheDocument();
+    // endereço inteiro, sem segredo, também é recusado com a mesma mensagem
+    await user.clear(field);
+    await user.type(field, 'otpauth://totp/GitHub:eu?issuer=GitHub');
+    expect(await screen.findByText(/Endereço inválido ou sem segredo/)).toBeInTheDocument();
+  });
+
+  it('não reclama enquanto o campo está vazio', () => {
+    installApi();
+    render(
+      <MessagesProvider language="pt-BR">
+        <AuthTokenModal
+          token={null}
+          onClose={() => undefined}
+          onSaved={() => undefined}
+          onError={() => undefined}
+        />
+      </MessagesProvider>,
+    );
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('tira o aviso assim que o endereço fica válido', async () => {
+    const user = userEvent.setup();
+    installApi();
+    render(
+      <MessagesProvider language="pt-BR">
+        <AuthTokenModal
+          token={null}
+          onClose={() => undefined}
+          onSaved={() => undefined}
+          onError={() => undefined}
+        />
+      </MessagesProvider>,
+    );
+
+    const field = screen.getByRole('textbox');
+    await user.type(field, 'lixo');
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    await user.clear(field);
+    await user.type(field, GITHUB_URI);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
   it('manda o endereço inteiro para o main e não monta o segredo na tela', async () => {
     const saved = vi.fn();
     const api = installApi();

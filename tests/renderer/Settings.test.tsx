@@ -129,7 +129,7 @@ describe('Configurações: autodestruição por tentativas', () => {
 
     render(<Settings />);
     await user.click(await screen.findByRole('button', { name: /Ativar autodestruição/i }));
-    await user.type(screen.getByRole('textbox', { name: '' }), '60');
+    await user.type(screen.getByLabelText('Digite o limite para confirmar'), '60');
     await user.click(screen.getByRole('button', { name: /Ativar autodestruição/i }));
 
     expect(setNuke).toHaveBeenCalledWith(60);
@@ -150,7 +150,7 @@ describe('Configurações: autodestruição por tentativas', () => {
 
     render(<Settings />);
     await user.click(await screen.findByRole('button', { name: /Ativar autodestruição/i }));
-    await user.type(screen.getByRole('textbox', { name: '' }), '5');
+    await user.type(screen.getByLabelText('Digite o limite para confirmar'), '5');
     await user.click(screen.getByRole('button', { name: /Ativar autodestruição/i }));
 
     expect(await screen.findByText(/baixo demais/i)).toBeInTheDocument();

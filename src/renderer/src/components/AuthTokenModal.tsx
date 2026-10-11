@@ -145,6 +145,13 @@ export function AuthTokenModal({
                 className={`${fieldClass} resize-none font-mono text-xs`}
               />
             </label>
+            {uri.trim() !== '' && preview === null && (
+              // sem isto, colar um endereço pela metade e esperar o botão "Salvar"
+              // para descobrir que faltava o segredo é a única forma de saber
+              <p role="alert" className="text-xs text-rose-400">
+                {m.authenticator.uriInvalid}
+              </p>
+            )}
             {preview !== null && (
               <p className="text-xs text-emerald-400">
                 {preview.issuer !== '' ? preview.issuer : m.authenticator.issuerFallback}

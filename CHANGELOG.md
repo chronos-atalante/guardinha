@@ -4,8 +4,6 @@ Todos os lançamentos seguem [versionamento semântico](https://semver.org/lang/
 (`MAJOR.MINOR.PATCH`) e o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 em português do Brasil.
 
-## [Não lançado]
-
 ## [1.5.0] - 2026-10-11
 
 ### Adicionado
@@ -37,6 +35,18 @@ em português do Brasil.
 - A pasta `.auth` é criada em `0700` e os arquivos em `0600`, com escrita
   atômica (`.tmp` + `rename`), e o id do arquivo é validado contra path
   traversal como o das credenciais (CVE-2026-21589).
+
+### Corrigido
+
+- **Campo do limite de autodestruição sem rótulo** (`Settings.tsx`): os dois
+  campos de limite eram localizáveis só por `placeholder`, e o de confirmação
+  não tinha nem isso. As mensagens `nukeLabel` e `nukeConfirmLabel` já existiam
+  desde sempre no `pt-BR` e no `en` e nunca foram ligadas ao formulário.
+- **Falha silenciosa ao colar o endereço `otpauth://`** (`AuthTokenModal.tsx`):
+  um endereço inválido ou sem segredo só descobria no botão "Salvar". Agora a
+  aba avisa enquanto se digita, e o aviso some sozinho quando o endereço passa a
+  servir. O texto de dica também ficou explícito: o segredo é cifrado dentro do
+  cofre e não sai mais dele.
 
 ### Notas
 

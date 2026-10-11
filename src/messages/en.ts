@@ -189,8 +189,11 @@ export const en: Messages = {
     uriLabel: 'Address the site showed',
     uriPlaceholder: 'otpauth://totp/GitHub:you?secret=…&issuer=GitHub',
     uriHint:
-      'Paste the whole address, secret included. It is decrypted inside the vault ' +
-      'and **never saved anywhere else**.',
+      'Paste the whole address, secret included. The secret is encrypted **inside the ' +
+      'vault** and never leaves it.',
+    uriInvalid:
+      'Invalid address or missing secret. Check that you pasted everything, starting at ' +
+      '`otpauth://totp/`.',
     secretLabel: 'Setup key (Base32)',
     secretPlaceholder: 'JBSW Y3DP EHPK 3PXP',
     secretHint: 'The key is normalized: uppercase, no spaces and no dashes.',

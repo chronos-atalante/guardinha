@@ -194,7 +194,10 @@ export const ptBR = {
     uriLabel: 'Endereço que o site mostrou',
     uriPlaceholder: 'otpauth://totp/GitHub:voce?secret=…&issuer=GitHub',
     uriHint:
-      'Cole o endereço inteiro, com o segredo. Ele é decifrado no cofre e **não é salvo** fora daqui.',
+      'Cole o endereço inteiro, com o segredo. O segredo é cifrado **dentro do cofre** ' +
+      'e não sai mais daqui.',
+    uriInvalid:
+      'Endereço inválido ou sem segredo. Confira se colou tudo, a partir de `otpauth://totp/`.',
     secretLabel: 'Chave de configuração (Base32)',
     secretPlaceholder: 'JBSW Y3DP EHPK 3PXP',
     secretHint: 'Normalizamos a chave: maiúsculas, sem espaço e sem hífen.',
