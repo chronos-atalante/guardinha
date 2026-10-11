@@ -46,7 +46,7 @@ contrário).
   (`panicDestroy`, em `src/main/vault.ts`), que **zera a chave da RAM antes de
   tocar no disco**: se o disco falhar, a memória já está limpa.
 - **Sobrescrita antes do `unlink`**: todo arquivo apagado pelo app (container,
-  `.zke`, `.enc` e temporários) passa por `shredFile` (`src/main/shred.ts`),
+  `.zke` e temporários) passa por `shredFile` (`src/main/shred.ts`),
   que sobrescreve em blocos de 64 KiB alternando bytes aleatórios e zeros,
   termina com a passada de zeros, faz `fsync` antes de fechar (sem isso a
   sobrescrita pode ficar só no cache de página), apaga o nome e sincroniza o
@@ -81,7 +81,7 @@ contrário).
   senha, PIN ou frase, e o desbloqueio é uma cadeia (`src/main/unlock.ts`) em
   que a trava exponencial corta antes da derivação Argon2id.
 - **AES-256-GCM por registro**: salt e IV de 128 bits gerados por hardware,
-  chave por arquivo via HKDF-SHA512; `vault.zkv` (versão 4) guarda cada chave
+  chave por arquivo via HKDF-SHA512; `vault.zkv` (versão 5) guarda cada chave
   embrulhada com o custo do Argon2id daquele método, a trava exponencial, o
   contador de tentativas da senha mestra, o limite de autodestruição e o
   manifesto cifrado. Cofres nas versões 2 e 3 continuam legíveis: a v3 tem o

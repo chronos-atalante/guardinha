@@ -78,9 +78,12 @@ describe('LanguageSelect: estado fechado', () => {
 
     await user.click(trigger());
 
+    // a ordem de exibição é decisão de produto e muda; o teste pergunta pelo
+    // idioma, não pela posição
+    const active = LANGUAGES.indexOf('en');
     const options = screen.getAllByRole('option');
-    expect(options[0]).toHaveAttribute('aria-selected', 'false');
-    expect(options[1]).toHaveAttribute('aria-selected', 'true');
+    expect(options[active - 1]).toHaveAttribute('aria-selected', 'false');
+    expect(options[active]).toHaveAttribute('aria-selected', 'true');
   });
 
   it('leva o foco ao idioma ativo ao abrir', async () => {

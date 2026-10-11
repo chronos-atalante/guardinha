@@ -18,7 +18,6 @@ async function makeContainer(): Promise<VaultContainerData> {
   const key = Buffer.alloc(32, 5);
   return {
     createdAt: Date.now(),
-    kdf: keyUnwrapperFor('pin').kdf,
     attempts: 0,
     lockUntil: null,
     attemptsMaster: 0,

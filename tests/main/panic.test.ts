@@ -63,9 +63,9 @@ beforeEach(() => {
   vaultSession().wipe();
   clearDestroyedFlag();
   fs.rmSync(vaultDir(), { recursive: true, force: true });
-  const data = unpackVaultContainer(snapshot);
-  if (data === null) throw new Error('fotografia do cofre ficou inválida');
-  writeVaultContainer(data);
+  const unpacked = unpackVaultContainer(snapshot);
+  if (!unpacked.ok) throw new Error(`fotografia do cofre ficou inválida (${unpacked.reason})`);
+  writeVaultContainer(unpacked.data);
   vaultSession().adopt(vaultKey);
 });
 

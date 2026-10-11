@@ -2,18 +2,21 @@
 
 Todo texto fixo da interface (e das mensagens de erro do processo main) vive em
 `src/messages/`, nunca espalhado pelo código. O app nasce em **português
-(Brasil)** e também fala **inglês**; o idioma é escolhido na Sidebar e
-persistido em `settings.json` (`AppSettings.language`).
+(Brasil)** e também fala **chinês simplificado**, **coreano**, **japonês** e
+**inglês**; o idioma é escolhido na Sidebar e persistido em `settings.json`
+(`AppSettings.language`).
 
 ## O contrato
 
 - `src/messages/pt-BR.ts` é o **canônico**: exporta `ptBR` e
   `export type Messages = typeof ptBR`. Toda chave e assinatura nasce aqui.
-- `src/messages/en.ts` exporta `en: Messages`; o TypeScript aponta qualquer
-  chave ou parâmetro faltando (ou sobrando) na tradução.
-- `src/messages/index.ts` é o barrel: `LANGUAGES` (`'pt-BR' | 'en'`),
-  `LANGUAGE_LABELS` (nome nativo do idioma, que **não** se traduz),
-  `messages()` e os bundles.
+- `src/messages/zh-CN.ts`, `ko.ts`, `ja.ts` e `en.ts` exportam cada um o seu
+  bundle como `Messages`; o TypeScript aponta qualquer chave ou parâmetro
+  faltando (ou sobrando) na tradução.
+- `src/messages/index.ts` é o barrel: `LANGUAGES` (a ordem de exibição é
+  `'pt-BR' | 'zh-CN' | 'ko' | 'ja' | 'en'`, com o português canônico primeiro e
+  o inglês por último), `LANGUAGE_LABELS` (nome nativo do idioma, que **não** se
+  traduz), `messages()` e os bundles.
 
 Regras das strings:
 
@@ -48,10 +51,11 @@ Sidebar (`settings.set`).
 ## Adicionando uma string
 
 1. Crie a chave em `src/messages/pt-BR.ts` (com parâmetro, se variar).
-2. Traduza em `src/messages/en.ts`; o typecheck reclama se faltar.
+2. Traduza em `zh-CN.ts`, `ko.ts`, `ja.ts` e `en.ts`; o typecheck reclama se
+   faltar em qualquer um.
 3. Use via `useMessages()` (renderer) ou `currentMessages()` (main).
-4. `npm run check` + `npm test` (o teste `tests/messages/parity.test.ts`
-   confere paridade de chaves e aridade).
+4. `npm run check` + `npm test` (o `tests/messages/parity.test.ts` confere
+   paridade de chaves e aridade).
 
 ## Adicionando um idioma
 
@@ -59,5 +63,14 @@ Sidebar (`settings.set`).
 2. Novo bundle `src/messages/<código>.ts` tipado como `Messages` + registro em
    `BUNDLES`, `LANGUAGES` e `LANGUAGE_LABELS` (`src/messages/index.ts`).
 3. A normalização em `src/main/settings.ts` (`normalizeLanguage`) passa a
-   aceitar o novo valor.
-4. Estenda `tests/messages/parity.test.ts` para o bundle novo.
+   aceitar o novo valor sem mudar: ela valida contra `LANGUAGES`.
+4. Estenda a lista `TRADUCOES` em `tests/messages/parity.test.ts`.
+
+## Fontes CJK
+
+`zh-CN`, `ko` e `ja` só aparecem com hanzi e hangul. Numa instalação sem fonte
+CJK (o `fonts-noto-cjk` não vem por padrão em toda distro) esses caracteres
+sairiam como quadradinhos. Por isso `globals.css` declara `--font-cjk` e a
+aplica depois do `system-ui`, que resolve sozinho quando existe fonte instalada.
+A pilha é só plano B: Noto, Source Han, as fontes do sistema e `sans-serif` no
+fim, para nunca ficar sem nada legível.

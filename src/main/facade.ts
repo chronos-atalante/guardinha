@@ -15,15 +15,13 @@ import {
 import { deleteAuth, listAuthIds, readAuthPayload, writeAuthPayload } from '@zero/main/auth-store';
 import {
   initManifest,
-  isVaultDirUnavailable,
   readVaultContainer,
   updateManifest,
   vaultExists,
-  vaultPath,
   verifyManifest,
   writeVaultContainer,
 } from '@zero/main/storage';
-import { ensureVaultStructure } from '@zero/main/structure';
+import { ensureVaultStructure, isVaultDirUnavailable, vaultPath } from '@zero/main/structure';
 import { cleanStaleTempFiles } from '@zero/main/entries-store';
 import { eraseVault } from '@zero/main/erase';
 import { currentMessages } from '@zero/main/i18n';

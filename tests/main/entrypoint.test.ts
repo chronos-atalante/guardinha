@@ -150,6 +150,7 @@ describe('canal clipboard:copy', () => {
 describe('canal generator:generate', () => {
   const base = {
     length: 24,
+    useLower: true,
     useUpper: true,
     useNumbers: true,
     useSymbols: true,
@@ -179,6 +180,31 @@ describe('canal generator:generate', () => {
     expect(() =>
       call('generator:generate', appFrame(), { ...base, customEntropyWords: 'palavra' }),
     ).toThrow(currentMessages().errors.invalidGenerator);
+  });
+
+  it('gera só com a categoria que sobrou marcada', () => {
+    const m = currentMessages();
+    const senha = call('generator:generate', appFrame(), {
+      ...base,
+      useLower: false,
+      useNumbers: false,
+      useSymbols: false,
+      length: 40,
+    });
+    expect(senha).toMatch(/^[A-Z]+$/);
+    expect(senha).toHaveLength(40);
+
+    // sem nenhuma categoria não há o que sortear, e devolver vazio seria
+    // fingir que gerou uma senha
+    expect(() =>
+      call('generator:generate', appFrame(), {
+        ...base,
+        useLower: false,
+        useUpper: false,
+        useNumbers: false,
+        useSymbols: false,
+      }),
+    ).toThrow(m.errors.invalidGenerator);
   });
 });
 

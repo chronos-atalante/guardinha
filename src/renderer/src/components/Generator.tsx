@@ -18,6 +18,7 @@ function errorMessage(error: unknown, fallback: string): string {
 export function Generator({ onToast }: GeneratorProps): JSX.Element {
   const m = useMessages();
   const [length, setLength] = useState<number>(24);
+  const [useLower, setUseLower] = useState(true);
   const [useUpper, setUseUpper] = useState(true);
   const [useNumbers, setUseNumbers] = useState(true);
   const [useSymbols, setUseSymbols] = useState(true);
@@ -38,6 +39,7 @@ export function Generator({ onToast }: GeneratorProps): JSX.Element {
     try {
       const password = await window.api.generator.generate({
         length,
+        useLower,
         useUpper,
         useNumbers,
         useSymbols,
@@ -60,9 +62,22 @@ export function Generator({ onToast }: GeneratorProps): JSX.Element {
 
   const toggles: { checked: boolean; set: (value: boolean) => void; label: string }[] = [
     { checked: useUpper, set: setUseUpper, label: m.generator.upper },
+    { checked: useLower, set: setUseLower, label: m.generator.lower },
     { checked: useNumbers, set: setUseNumbers, label: m.generator.numbers },
     { checked: useSymbols, set: setUseSymbols, label: m.generator.symbols },
   ];
+
+  const checkedCount = toggles.filter((toggle) => toggle.checked).length;
+
+  /**
+   * O conjunto de caracteres da senha é só o que está marcado, então desligar a
+   * última categoria deixaria o gerador sem o que sortear. A última ligada fica
+   * ligada: para trocar tudo de vez, o usuário desliga uma e liga outra.
+   */
+  const handleToggle = (set: (value: boolean) => void, checked: boolean): void => {
+    if (!checked && checkedCount <= 1) return;
+    set(checked);
+  };
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -86,7 +101,7 @@ export function Generator({ onToast }: GeneratorProps): JSX.Element {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           {toggles.map((toggle) => (
             <label
               key={toggle.label}
@@ -95,7 +110,9 @@ export function Generator({ onToast }: GeneratorProps): JSX.Element {
               <input
                 type="checkbox"
                 checked={toggle.checked}
-                onChange={(e) => toggle.set(e.target.checked)}
+                onChange={(e) => {
+                  handleToggle(toggle.set, e.target.checked);
+                }}
                 className="accent-emerald-500"
               />
               {toggle.label}

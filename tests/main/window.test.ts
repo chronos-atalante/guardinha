@@ -140,6 +140,13 @@ describe('guardas de navegação e sessão', () => {
     // ao iniciar em máquina com o driver VA-API do Intel quebrado
     expect(app.commandLine.appendSwitch).toHaveBeenCalledWith('disable-accelerated-video-decode');
   });
+
+  it('cala o log nativo do Chromium ao subir', () => {
+    // sem isso, cada cópia de credencial ou de código 2FA polui o terminal com
+    // `Add application/vnd.portal.filetransfer to kAtomsToCache`, que é bug
+    // upstream do Chromium e não erro do cofre
+    expect(app.commandLine.appendSwitch).toHaveBeenCalledWith('log-level', '3');
+  });
 });
 
 describe('sessão perdida durante uma operação do cofre', () => {

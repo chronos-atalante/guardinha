@@ -4,11 +4,10 @@ import { currentMessages } from '@zero/main/i18n';
 import { authDir, entriesDir, vaultDir } from '@zero/main/layout';
 
 /**
- * Estrutura de diretórios do cofre: garante as pastas com o modo certo,
- * migra o layout visível para o oculto e sabe listar o que existe lá dentro.
- * Fica entre `layout.ts` (só caminhos) e os módulos que leem e escrevem
- * arquivo, para que nenhum deles precise repetir a árvore de pastas nem criar
- * ciclo de importação com quem escreve o container.
+ * Estrutura de diretórios do cofre: garante as pastas com o modo certo e sabe
+ * listar o que existe lá dentro. Fica entre `layout.ts` (só caminhos) e os
+ * módulos que leem e escrevem arquivo, para que nenhum deles precise repetir a
+ * árvore de pastas nem criar ciclo de importação com quem escreve o container.
  */
 
 export function isPermissionError(error: unknown): boolean {
@@ -17,20 +16,9 @@ export function isPermissionError(error: unknown): boolean {
   return code === 'EACCES' || code === 'EPERM' || code === 'EROFS';
 }
 
-/**
- * Layout oculto: `entries/` (visível) vira `.entries/`. O rename é barato e
- * idempotente; roda antes de qualquer leitura/escrita das credenciais.
- */
-export function migrateHiddenLayout(): void {
-  const oldDir = path.join(vaultDir(), 'entries');
-  const newDir = path.join(vaultDir(), '.entries');
-  if (fs.existsSync(oldDir) && !fs.existsSync(newDir)) fs.renameSync(oldDir, newDir);
-}
-
 /** Garante a pasta do cofre em `/var/lib` com permissões restritas. */
 export function ensureVaultStructure(): void {
   try {
-    migrateHiddenLayout();
     fs.ensureDirSync(vaultDir(), { mode: 0o700 });
     fs.ensureDirSync(entriesDir(), { mode: 0o700 });
     fs.ensureDirSync(authDir(), { mode: 0o700 });

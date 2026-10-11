@@ -140,7 +140,7 @@ export const ptBR = {
     modalNew: 'Nova credencial',
     modalEdit: 'Editar credencial',
     titleLabel: 'Título',
-    titlePlaceholder: 'Ex.: GitHub',
+    titlePlaceholder: 'Ex.: Meu Serviço',
     usernameLabel: 'Usuário',
     usernamePlaceholder: 'seu.usuario',
     passwordLabel: 'Senha',
@@ -165,6 +165,7 @@ export const ptBR = {
     lengthLabel: 'Tamanho da Senha',
     lengthValue: (n: number): string => `${n} caracteres`,
     upper: 'Maiúsculas',
+    lower: 'Minúsculas',
     numbers: 'Números',
     symbols: 'Símbolos',
     entropyTitle: 'Injeção de Entropia Pessoal (5 itens/gostos aleatórios)',
@@ -192,7 +193,7 @@ export const ptBR = {
     tabUri: 'Endereço otpauth://',
     tabManual: 'Digitar a chave',
     uriLabel: 'Endereço que o site mostrou',
-    uriPlaceholder: 'otpauth://totp/GitHub:voce?secret=…&issuer=GitHub',
+    uriPlaceholder: 'otpauth://totp/MeuServico:voce?secret=…&issuer=MeuServico',
     uriHint:
       'Cole o endereço inteiro, com o segredo. O segredo é cifrado **dentro do cofre** ' +
       'e não sai mais daqui.',
@@ -202,15 +203,15 @@ export const ptBR = {
     secretPlaceholder: 'JBSW Y3DP EHPK 3PXP',
     secretHint: 'Normalizamos a chave: maiúsculas, sem espaço e sem hífen.',
     issuerLabel: 'Serviço',
-    issuerPlaceholder: 'GitHub',
+    issuerPlaceholder: 'Meu Serviço',
     accountLabel: 'Conta',
     accountPlaceholder: 'voce@exemplo.com',
     algorithmLabel: 'Algoritmo',
     digitsLabel: 'Dígitos',
     periodLabel: 'Validade (segundos)',
     algorithmHint:
-      'O algoritmo é escolhido pelo serviço, não por nós. **SHA1** é o padrão de ' +
-      'GitHub, Discord, Google e da maioria; SHA256 e SHA512 existem para os poucos que pedem.',
+      'O algoritmo é escolhido pelo serviço, não por nós. **SHA1** é o padrão da ' +
+      'maioria; SHA256 e SHA512 existem para os poucos que pedem.',
     deleteConfirm: 'Excluir este token de 2FA? Esta ação não pode ser desfeita.',
     saveError: 'Não foi possível salvar o token.',
     removeError: 'Não foi possível remover o token.',
@@ -231,10 +232,6 @@ export const ptBR = {
 
   settings: {
     title: 'Configurações',
-    emptyTitle: 'Em breve',
-    emptyText:
-      'As configurações do Guardinha serão implementadas em uma versão futura. ' +
-      'Enquanto isso, o idioma e o bloqueio do cofre continuam aqui na barra lateral.',
     panicTitle: 'PIN de coação',
     panicSubtitle:
       'Um segundo PIN que **abre um cofre vazio** e apaga o cofre de verdade. ' +
@@ -286,6 +283,14 @@ export const ptBR = {
     vaultMissing: 'Cofre não encontrado em /var/lib/.guardinha/.vault/.',
     vaultLocked: 'Cofre bloqueado: desbloqueie antes de acessar as credenciais.',
     vaultTampered: 'O cofre está incompleto ou foi alterado fora do app.',
+    vaultUnsupportedVersion: (version?: number): string =>
+      version === undefined
+        ? 'Este cofre foi criado por outra versão do Guardinha, cujo formato esta ' +
+          'versão não lê mais. Nada foi perdido: os dados continuam cifrados no disco. ' +
+          'Abra com a versão do app que criou o cofre ou apague a pasta do cofre e crie um novo.'
+        : `Este cofre foi criado por outra versão do Guardinha (formato v${version}), que esta ` +
+          'versão não lê mais. Nada foi perdido: os dados continuam cifrados no disco. ' +
+          'Abra com a versão do app que criou o cofre ou apague a pasta do cofre e crie um novo.',
     vaultDestroyed: 'O cofre foi destruído e não pode mais ser aberto.',
     panicPinSame: 'O PIN de coação não pode ser igual ao PIN que abre o cofre.',
     invalidNukeLimit: 'Limite de tentativas inválido.',

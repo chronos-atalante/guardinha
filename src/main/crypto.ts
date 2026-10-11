@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { argon2id } from 'hash-wasm';
+import type { GeneratorOptions } from '@zero/types';
 
 /** Parâmetros do Argon2id usados na derivação da chave do cofre. */
 export interface Argon2Params {
@@ -27,7 +28,7 @@ export const KDF_CREDENTIAL: Argon2Params = { memoryKiB: 131_072, iterations: 3,
 export const KDF_PIN: Argon2Params = { memoryKiB: 262_144, iterations: 4, parallelism: 4 };
 
 /** Perfil alvo por método de desbloqueio (escrita e migração incremental). */
-export function kdfProfileFor(kind: 'master' | 'pin' | 'recovery'): Argon2Params {
+export function kdfProfileFor(kind: 'master' | 'pin'): Argon2Params {
   return kind === 'pin' ? KDF_PIN : KDF_CREDENTIAL;
 }
 
@@ -97,11 +98,6 @@ function deriveRecordKey(vaultKey: Buffer, salt: Buffer, info: string): Buffer {
   return Buffer.from(crypto.hkdfSync('sha512', vaultKey, salt, info, 32));
 }
 
-/** Derivação de chave por arquivo (HKDF-SHA512 a partir da chave do cofre). */
-export function deriveEntryKey(vaultKey: Buffer, salt: Buffer): Buffer {
-  return deriveRecordKey(vaultKey, salt, KEY_INFO_ENTRY);
-}
-
 /** Mesma derivação, com o rótulo dos tokens de 2FA. */
 export function deriveAuthKey(vaultKey: Buffer, salt: Buffer): Buffer {
   return deriveRecordKey(vaultKey, salt, KEY_INFO_AUTH);
@@ -119,6 +115,15 @@ export function randomUuid(): string {
  * Criptografia por arquivo individual com AES-256-GCM.
  * Salt (128-bits) e IV (128-bits) gerados por hardware para cada arquivo.
  * O `info` separa os domínios do HKDF (ver `KEY_INFO_*` acima).
+ *
+ * Por que 128 bits bastam: salt não é segredo, precisa ser único, e a
+ * recomendação do NIST (SP 800-132) é 128 bits, colisão só aparece perto de
+ * 2^64 arquivos. No IV, o risco do GCM não é o tamanho, é o reuso (repetir IV
+ * com a mesma chave quebra a autenticação); sortear um nonce novo a cada
+ * gravação já torna o reuso improvável. Aqui cada registro ainda deriva uma
+ * chave própria pelo HKDF, então IV repetido entre arquivos nem se encontra.
+ * Aperto que realmente conta contra força bruta é o custo do Argon2id, não o
+ * tamanho destes dois.
  */
 export function encryptRecord(data: object, key: Buffer, info = KEY_INFO_ENTRY): SaltedPayload {
   const salt = crypto.randomBytes(16);
@@ -177,23 +182,42 @@ export function normalizeRecoveryPhrase(phrase: string): string {
     .join(' ');
 }
 
-/** Gerador com injeção de palavras de entropia personalizada. */
-export function generateHighEntropyPassword(
-  length: number,
-  useUpper: boolean,
-  useNumbers: boolean,
-  useSymbols: boolean,
-  customEntropyWords: string[],
-): string {
-  if (length <= 0) return '';
+/**
+ * Conjuntos de caracteres por categoria. Ficam aqui, e não inline na função,
+ * para que o teste do gerador possa conferir o mesmo conjunto que ele usa.
+ */
+const CHARS_LOWER = 'abcdefghijklmnopqrstuvwxyz';
+const CHARS_UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const CHARS_NUMBERS = '0123456789';
+const CHARS_SYMBOLS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
 
-  let charSet = 'abcdefghijklmnopqrstuvwxyz';
-  if (useUpper) charSet += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  if (useNumbers) charSet += '0123456789';
-  if (useSymbols) charSet += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+/**
+ * Conjunto de caracteres da senha: só as categorias marcadas na tela. Só
+ * "Maiúsculas" sai só maiúsculas, só "Números" sai só números, e assim por
+ * diante. Sem nenhuma categoria marcada não há o que sortear, então devolve
+ * vazio (a tela não deixa chegar aqui: a última categoria ligada não desliga).
+ */
+export function passwordCharSet(options: GeneratorOptions): string {
+  let charSet = '';
+  if (options.useLower) charSet += CHARS_LOWER;
+  if (options.useUpper) charSet += CHARS_UPPER;
+  if (options.useNumbers) charSet += CHARS_NUMBERS;
+  if (options.useSymbols) charSet += CHARS_SYMBOLS;
+  return charSet;
+}
+
+/**
+ * Gerador com injeção de palavras de entropia personalizada. O segredo sai do
+ * `crypto` do Node (hardware), nunca do `Math.random` do renderer.
+ */
+export function generateHighEntropyPassword(options: GeneratorOptions): string {
+  const { length } = options;
+  if (length <= 0) return '';
+  const charSet = passwordCharSet(options);
+  if (charSet === '') return '';
 
   // Mistura palavras pessoais com entropia criptográfica de sistema
-  const combinedEntropy = customEntropyWords.join('');
+  const combinedEntropy = options.customEntropyWords.join('');
   const personalDigest = crypto
     .createHash('sha512')
     .update(combinedEntropy + crypto.randomBytes(32).toString('hex'))

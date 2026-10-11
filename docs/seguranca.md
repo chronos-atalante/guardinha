@@ -67,7 +67,7 @@ O acesso ao disco é concentrado, e a divisão é por domínio, não por arquivo
 | `src/main/layout.ts`        | Nada: só resolve caminhos, sem `fs` e sem Electron       |
 | `src/main/structure.ts`     | Pastas do cofre, permissões, migração de layout          |
 | `src/main/storage.ts`       | O `vault.zkv` e as migrações dos formatos anteriores     |
-| `src/main/entries-store.ts` | Os arquivos `.zke`/`.enc` de cada credencial             |
+| `src/main/entries-store.ts` | Os arquivos `.zke` de cada credencial                    |
 | `src/main/auth-store.ts`    | Os arquivos `.zka` de cada token de 2FA                  |
 | `src/main/shred.ts`         | Sobrescrita e remoção; recebe sempre caminho já validado |
 | `src/main/erase.ts`         | Orquestra o erase, compondo os dois últimos              |

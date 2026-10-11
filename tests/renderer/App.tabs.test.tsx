@@ -9,7 +9,7 @@ import {
   installApi,
   unsubscribeAutoLock,
 } from '../mocks/api.ts';
-import type { AuthToken } from '@zero/types';
+import type { AppSettings, AuthToken } from '@zero/types';
 
 /**
  * O `App` é o roteador das telas e o dono de duas decisões que valem teste:
@@ -128,7 +128,7 @@ describe('App: idioma', () => {
   it('começa no idioma salvo e troca pelo seletor da barra lateral', async () => {
     const user = userEvent.setup();
     const api = installApi({ status: UNLOCKED, language: 'pt-BR' });
-    const set = vi.fn((next: { language: 'pt-BR' | 'en' }) => Promise.resolve(next));
+    const set = vi.fn((next: AppSettings) => Promise.resolve(next));
     api.settings.set = set;
 
     render(<App />);

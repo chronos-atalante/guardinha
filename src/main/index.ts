@@ -24,9 +24,10 @@ import {
   saveToken,
   saveTokenFromUri,
 } from '@zero/main/authenticator';
-import { generateHighEntropyPassword } from '@zero/main/crypto';
+import { generateHighEntropyPassword, passwordCharSet } from '@zero/main/crypto';
 import { secureClipboard } from '@zero/main/clipboard';
 import { vaultStorage } from '@zero/main/facade';
+import { quietChromiumLog } from '@zero/main/logging';
 import { loadSettings, saveSettings } from '@zero/main/settings';
 import { currentMessages } from '@zero/main/i18n';
 import type {
@@ -395,13 +396,12 @@ function registerIpc(): void {
     if (!Array.isArray(options.customEntropyWords)) {
       throw new Error(m.errors.invalidGenerator);
     }
-    return generateHighEntropyPassword(
-      length,
-      options.useUpper,
-      options.useNumbers,
-      options.useSymbols,
-      options.customEntropyWords,
-    );
+    // Categorias desmarcadas saem do conjunto; sem nenhuma marcada não há o
+    // que sortear, e devolver vazio seria fingir que gerou uma senha.
+    if (passwordCharSet(options) === '') {
+      throw new Error(m.errors.invalidGenerator);
+    }
+    return generateHighEntropyPassword(options);
   });
 
   ipcMain.handle('settings:get', (event) => {
@@ -445,6 +445,7 @@ if (!gotLock) {
 
   // switch de linha de comando precisa estar antes do `whenReady`
   disableVideoDecode();
+  quietChromiumLog();
 
   app
     .whenReady()

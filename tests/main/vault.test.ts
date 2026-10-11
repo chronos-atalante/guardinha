@@ -287,4 +287,31 @@ describe('ciclo de vida do cofre (integração)', () => {
     // os outros métodos só sobem quando a própria credencial for usada
     expect(readVaultContainer()?.methods.master?.kdf).toMatchObject(KDF_CREDENTIAL);
   });
+
+  it('11. cofre de outra versão recusa com mensagem que explica o caso', async () => {
+    // O formato do container é de uma versão só. Um cofre gravado por outra
+    // versão está inteiro e cifrado, então a tela precisa dizer isso: dizer
+    // "alterado fora do app" faz o usuário achar que perdeu os dados.
+    const containerFile = path.join(process.env.GUARDINHA_VAULT_DIR ?? '', 'vault.zkv');
+    const before = fs.readFileSync(containerFile);
+
+    const older = Buffer.from(before);
+    older.writeUInt32BE(4, 8);
+    fs.writeFileSync(containerFile, older);
+
+    const result = await unlock({ credential: PIN, kind: 'pin' });
+    expect(result.ok).toBe(false);
+    const message = result.ok ? '' : (result.error ?? '');
+    expect(message).toContain('Guardinha');
+    // o dado central: o usuário precisa saber que nada foi perdido
+    expect(message).toMatch(/nada foi perdido|Nada foi perdido/);
+    // e que a senha digitada não tem nada a ver com a recusa
+    expect(message).not.toBe(currentMessages().errors.wrongPin);
+    expect(message).not.toBe(currentMessages().errors.vaultTampered);
+    // recusa é resposta de negócio: nada de exceção subindo pelo handler do IPC
+    expect(message).toContain('v4');
+
+    fs.writeFileSync(containerFile, before);
+    expect((await unlock({ credential: PIN, kind: 'pin' })).ok).toBe(true);
+  }, 120_000);
 });

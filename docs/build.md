@@ -21,6 +21,19 @@ empacotado em `.deb` pelo electron-builder. Nada disso entra no git: `out/`,
 Os binários `bin/osv-scanner` e `bin/shellcheck` não são versionados; copie-os
 de `Chronos/Biblioteca/bin/` ou baixe as releases correspondentes.
 
+## O banner do README
+
+`docs/assets/banner.png` é a capa do README e a fonte é
+[`build/banner.html`](../build/banner.html): a mesma paleta da landing page
+(`src/app/style/globals.css`) e as mesmas formas do hero
+(`src/components/HomeContent.tsx`), em 1280x400. É o único PNG do repositório
+que não sai de código, então o HTML fica versionado ao lado.
+
+Para regerar: troque `ICON_PATH` por `build/icon.png`, abra o HTML numa
+`BrowserWindow` de 1280x400 (`useContentSize: true`, `frame: false`,
+`backgroundColor: '#020617'`) e grave `capturePage().toPNG()`. O Electron já
+está no `node_modules` do projeto, então não é preciso navegador extra.
+
 ## Saída do build
 
 | Caminho                 | Conteúdo                                               |

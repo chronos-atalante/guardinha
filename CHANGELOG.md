@@ -4,6 +4,44 @@ Todos os lançamentos seguem [versionamento semântico](https://semver.org/lang/
 (`MAJOR.MINOR.PATCH`) e o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 em português do Brasil.
 
+## [1.6.1] - 2026-10-11
+
+### Adicionado
+
+- **Idiomas da interface:** português (Brasil), chinês simplificado, coreano,
+  japonês e inglês, incluindo mensagens do processo principal. O idioma pode
+  ser escolhido nas configurações e é salvo para os próximos usos.
+- **Categoria de letras minúsculas no gerador:** agora é possível escolher
+  separadamente letras maiúsculas, minúsculas, números e símbolos.
+- **Aviso para formato de cofre incompatível:** quando o arquivo pertence a
+  outra versão, a mensagem explica que os dados continuam cifrados e orienta a
+  abrir com a versão que o criou ou criar um novo cofre.
+
+### Alterado
+
+- **Formato do container para a versão 5:** o cabeçalho agora tem 41 bytes e
+  não inclui mais os parâmetros globais de KDF, que eram redundantes com os
+  parâmetros específicos de cada método.
+- **Compatibilidade de formatos anteriores removida:** esta versão só lê o
+  formato v5. Arquivos de versões anteriores permanecem no disco, mas precisam
+  ser abertos com a versão que os criou; não há migração automática.
+- **Seletor de idioma:** passa a usar o mesmo campo compacto de seleção usado
+  pelo restante da interface.
+- **Logs na inicialização:** mensagens nativas rotineiras do navegador
+  integrado deixam de poluir a saída do aplicativo. Avisos e erros do próprio
+  app continuam disponíveis; os logs nativos podem ser reativados com
+  `--log-level=0`.
+- **Persistência e limpeza do cofre:** o tratamento do container, das
+  credenciais, das permissões e da destruição foi simplificado e separado por
+  responsabilidade.
+
+### Corrigido
+
+- O gerador não permite desmarcar a última categoria de caracteres ativa,
+  evitando tentar gerar uma senha sem caracteres disponíveis.
+- O cálculo e a validação do conjunto de caracteres usam as mesmas opções,
+  tanto na interface quanto no processo principal.
+
 ## [1.5.0] - 2026-10-11
 
 ### Adicionado

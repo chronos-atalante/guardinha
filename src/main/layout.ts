@@ -1,4 +1,3 @@
-import os from 'node:os';
 import path from 'node:path';
 
 /**
@@ -6,12 +5,6 @@ import path from 'node:path';
  * Electron, para que `storage.ts`, o armazenamento das entradas e a rotina de
  * erasure concordem sobre o mesmo lugar sem repetir a árvore de diretórios.
  */
-
-function xdgDir(envVar: string, fallback: string): string {
-  const value = process.env[envVar];
-  if (value !== undefined && value !== '') return value;
-  return path.join(os.homedir(), fallback);
-}
 
 /**
  * Raiz do cofre: `/var/lib/.guardinha/.vault`, pastas ocultas por padrão
@@ -24,15 +17,6 @@ export function vaultDir(): string {
   const varLib = process.env.GUARDINHA_VAR_LIB;
   const base = varLib !== undefined && varLib !== '' ? varLib : '/var/lib';
   return path.join(base, '.guardinha', '.vault');
-}
-
-/** Cofre intermediário anterior em `$XDG_DATA_HOME/guardinha/vault`. */
-export function xdgVaultDir(): string {
-  return path.join(xdgDir('XDG_DATA_HOME', path.join('.local', 'share')), 'guardinha', 'vault');
-}
-
-export function legacyVaultDir(): string {
-  return path.join(os.homedir(), '.guardinha-vault');
 }
 
 export function entriesDir(): string {

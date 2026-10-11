@@ -52,7 +52,7 @@ entrypoints que o Electron exige) e arquivo no teto de ~500 linhas é quebrado.
 | `layout.ts`        | Onde o cofre mora: resolve caminhos, sem `fs` e sem Electron                        |
 | `structure.ts`     | Pastas do cofre, permissões e migração do layout oculto                             |
 | `storage.ts`       | O `vault.zkv` e as migrações dos formatos anteriores, chamada pela fachada          |
-| `entries-store.ts` | Os arquivos `.zke`/`.enc` de cada credencial                                        |
+| `entries-store.ts` | Os arquivos `.zke` de cada credencial                                               |
 | `auth-store.ts`    | Os arquivos `.zka` de cada token de 2FA, um por token                               |
 | `shred.ts`         | Sobrescrita antes do `unlink` (`O_NOFOLLOW`, `fsync`); primitiva de baixo nível     |
 | `erase.ts`         | Cryptographic Erase: apaga o container, as entradas e a pasta                       |

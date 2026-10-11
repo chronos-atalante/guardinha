@@ -1,44 +1,25 @@
 import fs from 'fs-extra';
 import path from 'node:path';
-import { isLegacyEntryPayload, packEntryPayload, unpackEntryPayload } from '@zero/main/container';
+import { packEntryPayload, unpackEntryPayload } from '@zero/main/container';
 import { currentMessages } from '@zero/main/i18n';
 import { entriesDir } from '@zero/main/layout';
-import { ensureVaultStructure, migrateHiddenLayout, vaultFiles } from '@zero/main/structure';
+import { ensureVaultStructure, vaultFiles } from '@zero/main/structure';
 import { randomBytes } from '@zero/main/crypto';
 import { SHRED_PASSES, shredFile } from '@zero/main/shred';
 import type { SaltedPayload } from '@zero/main/crypto';
 
 /**
- * Arquivos individuais das credenciais (`.entries/<uuid>.zke`, e o `.enc` legado
- * em JSON). Saiu de `storage.ts` para caber o erasure sem estourar o teto de
- * linhas do repositório: o container (`vault.zkv`), a trava e o manifesto ficam
- * lá, e aqui fica tudo que é um arquivo por credencial.
+ * Arquivos individuais das credenciais (`.entries/<uuid>.zke`). Saiu de
+ * `storage.ts` para caber o erasure sem estourar o teto de linhas do
+ * repositório: o container (`vault.zkv`), a trava e o manifesto ficam lá, e aqui
+ * fica tudo que é um arquivo por credencial.
  */
 
-const ENTRY_EXTENSIONS = ['zke', 'enc'] as const;
+/** Extensão única de payload de credencial; o binário tem magic próprio. */
+const ENTRY_EXTENSION = 'zke';
 
 function tampered(): Error {
   return new Error(currentMessages().errors.vaultTampered);
-}
-
-function asPayload(value: unknown): SaltedPayload | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const record = value as Record<string, unknown>;
-  if (
-    typeof record.salt !== 'string' ||
-    record.salt === '' ||
-    typeof record.iv !== 'string' ||
-    typeof record.tag !== 'string' ||
-    typeof record.encryptedData !== 'string'
-  ) {
-    return null;
-  }
-  return {
-    salt: record.salt,
-    iv: record.iv,
-    tag: record.tag,
-    encryptedData: record.encryptedData,
-  };
 }
 
 /**
@@ -59,41 +40,22 @@ export function createVaultKey(): Buffer {
 export function listEntryIds(): string[] {
   ensureVaultStructure();
   const ids = new Set<string>();
+  const suffix = `.${ENTRY_EXTENSION}`;
   for (const file of fs.readdirSync(entriesDir())) {
-    for (const extension of ENTRY_EXTENSIONS) {
-      if (file.endsWith(`.${extension}`)) ids.add(file.slice(0, -(extension.length + 1)));
-    }
+    if (file.endsWith(suffix)) ids.add(file.slice(0, -suffix.length));
   }
   return [...ids];
 }
 
 function entryFile(id: string): string {
-  const current = path.join(entriesDir(), `${id}.zke`);
-  if (fs.existsSync(current)) return current;
-  return path.join(entriesDir(), `${id}.enc`);
+  return path.join(entriesDir(), `${id}.${ENTRY_EXTENSION}`);
 }
 
 export function readEntryPayload(id: string): SaltedPayload {
   assertSafeEntryId(id);
-  migrateHiddenLayout();
   const file = entryFile(id);
   if (!fs.existsSync(file)) throw new Error(currentMessages().errors.entryNotFound);
   const raw = fs.readFileSync(file);
-
-  if (isLegacyEntryPayload(raw)) {
-    let legacy: unknown;
-    try {
-      legacy = JSON.parse(raw.toString('utf8'));
-    } catch {
-      throw tampered();
-    }
-    if (typeof legacy !== 'object' || legacy === null) throw tampered();
-    const payload = asPayload(legacy);
-    if (payload === null) throw tampered();
-    writeEntryPayload(id, payload);
-    return payload;
-  }
-
   const payload = unpackEntryPayload(raw);
   if (payload === null) throw tampered();
   return payload;
@@ -103,13 +65,10 @@ export function writeEntryPayload(id: string, payload: SaltedPayload): void {
   assertSafeEntryId(id);
   ensureVaultStructure();
   const buffer = packEntryPayload(payload);
-  const file = path.join(entriesDir(), `${id}.zke`);
+  const file = entryFile(id);
   const tmp = `${file}.tmp`;
   fs.writeFileSync(tmp, buffer, { mode: 0o600 });
   fs.renameSync(tmp, file);
-  const legacy = path.join(entriesDir(), `${id}.enc`);
-  // o `.enc` legado também é sobrescrito: é a mesma credencial em outro formato
-  if (fs.existsSync(legacy)) shredFile(legacy, SHRED_PASSES);
 }
 
 /**
@@ -121,17 +80,13 @@ export function writeEntryPayload(id: string, payload: SaltedPayload): void {
  */
 export function deleteEntry(id: string): void {
   assertSafeEntryId(id);
-  migrateHiddenLayout();
-  for (const extension of ENTRY_EXTENSIONS) {
-    const file = path.join(entriesDir(), `${id}.${extension}`);
-    if (fs.existsSync(file)) shredFile(file, SHRED_PASSES);
-  }
+  const file = entryFile(id);
+  if (fs.existsSync(file)) shredFile(file, SHRED_PASSES);
 }
 
 /**
  * Temporários órfãos: um `.tmp` deixado por um crash não é coberto pelo
- * manifesto (`listEntryIds` só lista `.zke` e `.enc`), então sobrevive sem
- * ninguém notar. Os mais velhos que `maxAgeMs` são sobrescritos e apagados; os
+ * manifesto (`listEntryIds` só lista `.zke`), então sobrevive sem ninguém notar. Os mais velhos que `maxAgeMs` são sobrescritos e apagados; os
  * mais novos são deixados intactos, porque podem ser de uma escrita em curso.
  */
 export function cleanStaleTempFiles(maxAgeMs: number): { removed: number; kept: number } {

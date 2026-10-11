@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import type { JSX } from 'react';
 import { X } from 'lucide-react';
-import { useMessages } from '@zero/renderer/i18n';
+import { richText, useMessages } from '@zero/renderer/i18n';
+import { SelectField } from '@zero/renderer/components/SelectField';
+import type { SelectOption } from '@zero/renderer/components/SelectField';
 import { OTP_ALGORITHMS, OTP_DIGIT_CHOICES, OTP_PERIOD_RANGE, parseOtpAuthUri } from '@zero/shared';
 import type { OtpAlgorithm } from '@zero/shared';
 import type { AuthToken, AuthTokenDraft } from '@zero/types';
@@ -31,6 +33,16 @@ interface AuthTokenModalProps {
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message !== '' ? error.message : fallback;
 }
+
+const ALGORITHM_OPTIONS: readonly SelectOption<OtpAlgorithm>[] = OTP_ALGORITHMS.map((value) => ({
+  value,
+  label: value,
+}));
+
+const DIGIT_OPTIONS: readonly SelectOption<number>[] = OTP_DIGIT_CHOICES.map((value) => ({
+  value,
+  label: String(value),
+}));
 
 export function AuthTokenModal({
   token,
@@ -149,7 +161,7 @@ export function AuthTokenModal({
               // sem isto, colar um endereço pela metade e esperar o botão "Salvar"
               // para descobrir que faltava o segredo é a única forma de saber
               <p role="alert" className="text-xs text-rose-400">
-                {m.authenticator.uriInvalid}
+                {richText(m.authenticator.uriInvalid)}
               </p>
             )}
             {preview !== null && (
@@ -159,7 +171,7 @@ export function AuthTokenModal({
                 {` · ${preview.algorithm} · ${preview.digits} · ${preview.period}s`}
               </p>
             )}
-            <p className="text-xs text-slate-500">{m.authenticator.uriHint}</p>
+            <p className="text-xs text-slate-500">{richText(m.authenticator.uriHint)}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -205,38 +217,18 @@ export function AuthTokenModal({
             </div>
 
             <div className="grid grid-cols-3 gap-3">
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-slate-300">
-                  {m.authenticator.algorithmLabel}
-                </span>
-                <select
-                  value={algorithm}
-                  onChange={(e) => setAlgorithm(e.target.value as OtpAlgorithm)}
-                  className={fieldClass}
-                >
-                  {OTP_ALGORITHMS.map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-slate-300">
-                  {m.authenticator.digitsLabel}
-                </span>
-                <select
-                  value={digits}
-                  onChange={(e) => setDigits(Number(e.target.value))}
-                  className={fieldClass}
-                >
-                  {OTP_DIGIT_CHOICES.map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <SelectField
+                label={m.authenticator.algorithmLabel}
+                options={ALGORITHM_OPTIONS}
+                value={algorithm}
+                onChange={setAlgorithm}
+              />
+              <SelectField
+                label={m.authenticator.digitsLabel}
+                options={DIGIT_OPTIONS}
+                value={digits}
+                onChange={setDigits}
+              />
               <label className="block space-y-1.5">
                 <span className="text-xs font-medium text-slate-300">
                   {m.authenticator.periodLabel}
@@ -251,7 +243,7 @@ export function AuthTokenModal({
                 />
               </label>
             </div>
-            <p className="text-xs text-slate-500">{m.authenticator.algorithmHint}</p>
+            <p className="text-xs text-slate-500">{richText(m.authenticator.algorithmHint)}</p>
           </div>
         )}
 
