@@ -32,6 +32,7 @@ export const ptBR = {
     nav: {
       home: 'Início (Senhas)',
       generator: 'Gerador de Senhas',
+      authenticator: 'Verificador 2FA',
       credits: 'Atribuições',
       settings: 'Configurações',
     },
@@ -174,6 +175,54 @@ export const ptBR = {
     toastCopied: 'Senha copiada.',
   },
 
+  /** Gerador de códigos de dois fatores (TOTP, RFC 6238). */
+  authenticator: {
+    title: 'Verificador 2FA',
+    subtitle:
+      'Códigos de uso único que os sites pedem depois da senha. ' +
+      'Cada token fica em um arquivo cifrado próprio, dentro do cofre.',
+    loading: 'Abrindo os tokens…',
+    emptyTitle: 'Nenhum token ainda',
+    emptyText:
+      'Ative a verificação em duas etapas no serviço, escolha "Não posso escanear" ' +
+      'e cole aqui o endereço `otpauth://` ou a chave de configuração.',
+    addToken: 'Adicionar token',
+    modalNew: 'Novo token de 2FA',
+    modalEdit: 'Editar token de 2FA',
+    tabUri: 'Endereço otpauth://',
+    tabManual: 'Digitar a chave',
+    uriLabel: 'Endereço que o site mostrou',
+    uriPlaceholder: 'otpauth://totp/GitHub:voce?secret=…&issuer=GitHub',
+    uriHint:
+      'Cole o endereço inteiro, com o segredo. O segredo é cifrado **dentro do cofre** ' +
+      'e não sai mais daqui.',
+    uriInvalid:
+      'Endereço inválido ou sem segredo. Confira se colou tudo, a partir de `otpauth://totp/`.',
+    secretLabel: 'Chave de configuração (Base32)',
+    secretPlaceholder: 'JBSW Y3DP EHPK 3PXP',
+    secretHint: 'Normalizamos a chave: maiúsculas, sem espaço e sem hífen.',
+    issuerLabel: 'Serviço',
+    issuerPlaceholder: 'GitHub',
+    accountLabel: 'Conta',
+    accountPlaceholder: 'voce@exemplo.com',
+    algorithmLabel: 'Algoritmo',
+    digitsLabel: 'Dígitos',
+    periodLabel: 'Validade (segundos)',
+    algorithmHint:
+      'O algoritmo é escolhido pelo serviço, não por nós. **SHA1** é o padrão de ' +
+      'GitHub, Discord, Google e da maioria; SHA256 e SHA512 existem para os poucos que pedem.',
+    deleteConfirm: 'Excluir este token de 2FA? Esta ação não pode ser desfeita.',
+    saveError: 'Não foi possível salvar o token.',
+    removeError: 'Não foi possível remover o token.',
+    loadError: 'Não foi possível carregar os tokens.',
+    toastSaved: 'Token salvo.',
+    toastRemoved: 'Token removido.',
+    toastCopied: 'Código copiado. Ele expira em poucos segundos.',
+    issuerFallback: 'Sem serviço',
+    expiresIn: (seconds: number): string => `expira em ${seconds}s`,
+    expiringSoon: 'renovando',
+  },
+
   attributions: {
     title: 'ATRIBUIÇÕES',
     footer: '© 2026, Proteção de Dados 100% Offline & Local',
@@ -265,6 +314,12 @@ export const ptBR = {
     invalidId: 'Identificador de credencial inválido.',
     entryNotFound: 'Credencial não encontrada.',
     invalidGenerator: 'Parâmetros inválidos para o gerador de senhas.',
+    invalidAuthToken: 'Parâmetros de token de 2FA inválidos.',
+    invalidAuthTokenUri:
+      'Endereço `otpauth://` inválido. Confira se colou o endereço inteiro, ' +
+      'começando em `otpauth://totp/`, e se o emissor bate com o rótulo.',
+    invalidAuthSecret: 'A chave de configuração precisa ser Base32 válido (A-Z e 2-7).',
+    authTokenNotFound: 'Token de 2FA não encontrado.',
     internal: 'Erro interno do cofre.',
   },
 };

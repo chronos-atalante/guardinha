@@ -18,6 +18,9 @@ quem precisa mexer no código saber onde cada medida mora e o que ela protege.
 | Fachada única de persistência (fs, cifra, manifesto)     | `src/main/facade.ts`                                                       |
 | Manifesto cifrado e falha fechada na adulteração         | `src/main/container.ts`, `src/main/storage.ts`                             |
 | Credenciais validadas antes de gravar                    | `src/main/entries.ts`, `src/main/auth.ts`                                  |
+| Segredo de 2FA cifrado e fora do renderer                | `src/main/authenticator.ts`, `src/main/auth-store.ts`                      |
+| Algoritmo de 2FA conforme a RFC (serviço manda, não nós) | `src/main/totp.ts`, `src/shared/otpauth.ts`                                |
+| Domínio de chave separado entre credencial e 2FA         | `src/main/crypto.ts` (`deriveAuthKey`, `KEY_INFO_AUTH`)                    |
 | Id de arquivo seguro (path traversal, CVE-2026-21589)    | `src/main/storage.ts` (`assertSafeEntryId`)                                |
 | Sobrescrita antes do `unlink` (`O_NOFOLLOW`, fsync)      | `src/main/shred.ts`                                                        |
 | Cryptographic Erase (apagar a chave embrulhada)          | `src/main/erase.ts`, `src/main/erasure-state.ts`                           |
@@ -50,8 +53,8 @@ Página do app → assertAppFrame → regra de domínio → fachada → arquivo 
 Nenhuma entrada do renderer passa direto para o disco: o id precisa ser UUID
 conhecido, o domínio aberto no navegador precisa começar por `http`/`https` e
 a chave do cofre é exigida pelas funções de domínio (`requireSessionKey`).
-`vault.ts` e `entries.ts` não tocam `fs` nem cifra: passam pela
-`VaultStorageFacade` (`src/main/facade.ts`). O desbloqueio passa pela cadeia
+`vault.ts`, `entries.ts` e `authenticator.ts` não tocam `fs` nem cifra: passam
+pela `VaultStorageFacade` (`src/main/facade.ts`). O desbloqueio passa pela cadeia
 `unlock.ts` (trava exponencial antes do Argon2id; PIN malformado não paga a
 derivação) e o desembrulho da chave sai do mapa `unwrapping.ts`.
 
@@ -65,6 +68,7 @@ O acesso ao disco é concentrado, e a divisão é por domínio, não por arquivo
 | `src/main/structure.ts`     | Pastas do cofre, permissões, migração de layout          |
 | `src/main/storage.ts`       | O `vault.zkv` e as migrações dos formatos anteriores     |
 | `src/main/entries-store.ts` | Os arquivos `.zke`/`.enc` de cada credencial             |
+| `src/main/auth-store.ts`    | Os arquivos `.zka` de cada token de 2FA                  |
 | `src/main/shred.ts`         | Sobrescrita e remoção; recebe sempre caminho já validado |
 | `src/main/erase.ts`         | Orquestra o erase, compondo os dois últimos              |
 | `src/main/settings.ts`      | O `settings.json` (que só tem idioma, sem segredo)       |

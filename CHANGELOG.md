@@ -4,6 +4,63 @@ Todos os lançamentos seguem [versionamento semântico](https://semver.org/lang/
 (`MAJOR.MINOR.PATCH`) e o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 em português do Brasil.
 
+## [1.5.0] - 2026-10-11
+
+### Adicionado
+
+- **Verificador de 2FA (TOTP)**: tela nova na barra lateral que gera os códigos
+  de uso único dos serviços (GitHub, Discord, Google, AWS, exchanges,
+  marketplaces). Implementa a RFC 6238 com os vetores oficiais dos anexos B e D
+  das RFCs 4226 e 6238 como testes, e aceita o endereço `otpauth://` que os
+  serviços exibem quando o usuário escolhe "não posso escanear agora".
+- **Pasta própria de tokens** em `/var/lib/.guardinha/.vault/.auth/`, um
+  arquivo `<uuid>.zka` por token, cifrado em AES-256-GCM com a chave do cofre
+  e com rótulo de domínio HKDF próprio (`guardinha-vault-auth-v1`), separado do
+  `guardinha-vault-entry-v1` das credenciais.
+- **Segredo de 2FA fora do renderer**: o segredo TOTP não é retorno de nenhum
+  canal de IPC. O renderer pede o código já calculado (`authenticator:codes`) e
+  recebe `{ id, code, remainingMs }`, então a chave nunca existe no processo
+  que tem DOM.
+
+### Segurança
+
+- O **manifesto de integridade** passou da versão 1 para a 2 e agora lista os
+  tokens de 2FA junto com as credenciais. Sem isso, apagar um `.zka` ou plantar
+  o seu próprio passaria despercebido. Cofres na v1 são lidos sem o campo novo
+  e voltam selados na v2 na escrita seguinte, sem migração e sem mudança no
+  formato do container.
+- O **Cryptographic Erase** passou a alcançar `.auth/`: os `.zka` são sobrescritos
+  e apagados junto com o container e as credenciais. Um segredo TOTP que
+  sobrevive ao erase é uma senha de servidor que sobrevive a ele.
+- A pasta `.auth` é criada em `0700` e os arquivos em `0600`, com escrita
+  atômica (`.tmp` + `rename`), e o id do arquivo é validado contra path
+  traversal como o das credenciais (CVE-2026-21589).
+
+### Corrigido
+
+- **Campo do limite de autodestruição sem rótulo** (`Settings.tsx`): os dois
+  campos de limite eram localizáveis só por `placeholder`, e o de confirmação
+  não tinha nem isso. As mensagens `nukeLabel` e `nukeConfirmLabel` já existiam
+  desde sempre no `pt-BR` e no `en` e nunca foram ligadas ao formulário.
+- **Falha silenciosa ao colar o endereço `otpauth://`** (`AuthTokenModal.tsx`):
+  um endereço inválido ou sem segredo só descobria no botão "Salvar". Agora a
+  aba avisa enquanto se digita, e o aviso some sozinho quando o endereço passa a
+  servir. O texto de dica também ficou explícito: o segredo é cifrado dentro do
+  cofre e não sai mais dele.
+
+### Notas
+
+- **BLAKE3 não entrou.** Ele foi avaliado e descartado de propósito: BLAKE3 foi
+  projetado para ser rápido, que é o oposto do que uma KDF de senha precisa
+  (o Argon2id continua sendo a KDF do cofre), e ele não pode entrar na geração
+  do código porque **o algoritmo é escolhido pelo serviço, não pelo app**.
+  Concatenar BLAKE3 com SHA-512 também não seria útil: um ataque a qualquer um
+  dos dois quebra o par. O segredo continua sob AES-256-GCM + HKDF-SHA512, e
+  o código sob HMAC nativo do Node, sem dependência nova.
+- **Steam Guard não é suportado**: o Steam usa TOTP por baixo, mas exibe 5
+  caracteres alfanuméricos de alfabeto customizado. Mostrar um número de 6
+  dígitos que o cliente recusa seria pior que não mostrar nada.
+
 ## [1.4.1]
 
 ### Adicionado

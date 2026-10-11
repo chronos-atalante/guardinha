@@ -358,15 +358,26 @@ describe('payload de entrada (.zke)', () => {
 });
 
 describe('manifesto de integridade', () => {
+  const IDS = ['aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', 'ffffffff-0000-4000-8000-000000000000'];
+  const AUTH_IDS = ['11111111-2222-4333-8444-555555555555'];
+
   it('roundtrip devolve os mesmos ids', () => {
     const key = randomBytes(32);
-    const ids = ['aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', 'ffffffff-0000-4000-8000-000000000000'];
-    expect(openManifest(key, sealManifest(key, ids))).toEqual(ids);
+    expect(openManifest(key, sealManifest(key, IDS, AUTH_IDS))).toEqual({
+      ids: IDS,
+      authIds: AUTH_IDS,
+    });
+  });
+
+  it('manifesto da v1 (só credenciais) abre com a lista de tokens vazia', () => {
+    const key = randomBytes(32);
+    const legacy = encryptRecord({ v: 1, ids: IDS }, key);
+    expect(openManifest(key, legacy)).toEqual({ ids: IDS, authIds: [] });
   });
 
   it('falha com a chave errada', () => {
     const key = randomBytes(32);
-    const blob = sealManifest(key, ['aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee']);
+    const blob = sealManifest(key, IDS, []);
     expect(() => openManifest(randomBytes(32), blob)).toThrow();
   });
 
@@ -374,5 +385,11 @@ describe('manifesto de integridade', () => {
     const key = randomBytes(32);
     const notManifest = encryptRecord({ foo: 1 }, key);
     expect(() => openManifest(key, notManifest)).toThrow();
+  });
+
+  it('falha quando a lista de tokens não é uma lista de texto', () => {
+    const key = randomBytes(32);
+    const broken = encryptRecord({ v: 2, ids: IDS, authIds: [1] }, key);
+    expect(() => openManifest(key, broken)).toThrow();
   });
 });

@@ -15,6 +15,8 @@ Todo texto vem do contexto de idioma (`useMessages()`), nunca embutido no JSX.
 | `EntryModal`        | Criar/editar credencial, com excluir quando é edição                    |
 | `AuthModal`         | Criação do cofre, desbloqueio e redefinição de PIN                      |
 | `Generator`         | Senha aleatória com comprimento, gostos e entropia pessoal              |
+| `Authenticator`     | Códigos de 2FA dos tokens, com contagem e cópia                         |
+| `AuthTokenModal`    | Criar/editar token pelo endereço `otpauth://` ou pela chave Base32      |
 | `SensitivitySlider` | Slider acessível do comprimento no Gerador (arraste, teclado, `aria`)   |
 | `StrengthMeter`     | Barra de força com nível, motivos e dica                                |
 | `Credits`           | Pós-créditos de cinema com as dependências em rolagem                   |
@@ -27,12 +29,13 @@ Todo texto vem do contexto de idioma (`useMessages()`), nunca embutido no JSX.
 
 ## Abas da Sidebar
 
-| Aba               | Componente  | Conteúdo                                              |
-| ----------------- | ----------- | ----------------------------------------------------- |
-| Início (Senhas)   | `Home`      | Busca, contagem, lista e botão de nova credencial     |
-| Gerador de Senhas | `Generator` | Slider de comprimento, três chaves e entropia pessoal |
-| Atribuições       | `Credits`   | Créditos em rolagem, com pausa no hover               |
-| Configurações     | `Settings`  | PIN de pânico e autodestruição por tentativas         |
+| Aba               | Componente      | Conteúdo                                              |
+| ----------------- | --------------- | ----------------------------------------------------- |
+| Início (Senhas)   | `Home`          | Busca, contagem, lista e botão de nova credencial     |
+| Gerador de Senhas | `Generator`     | Slider de comprimento, três chaves e entropia pessoal |
+| Verificador 2FA   | `Authenticator` | Lista de tokens com código, contagem e cópia          |
+| Atribuições       | `Credits`       | Créditos em rolagem, com pausa no hover               |
+| Configurações     | `Settings`      | PIN de pânico e autodestruição por tentativas         |
 
 O rodapé da Sidebar mostra que os dados estão locais. O botão de bloqueio chama
 `vault.lock()` e volta para a aba Início.
@@ -102,6 +105,22 @@ modal.
 Slider de comprimento (0 a 72, padrão 24), chaves de maiúsculas, números e
 símbolos e cinco campos de entropia pessoal. O botão gera no main, mostra a
 senha com medidor e copia com limpeza em 30 s.
+
+## Authenticator
+
+Cada token vira um cartão com serviço, conta, o código em monoespaçado e uma
+barra que esvazia ao longo do período. O código é sempre o que o main calculou:
+o renderer nunca tem o segredo, e quando o período vira ele pede o próximo em
+vez de recalcular (`authenticator:codes`). A contagem é um tique de 1 s.
+
+O botão de adicionar abre o `AuthTokenModal`, que aceita duas entradas para o
+mesmo segredo: o endereço `otpauth://` que o serviço mostra quando o usuário
+escolhe "não posso escanear agora", com prévia do que ele resolve antes de
+salvar; ou a chave Base32 digitada à mão, com emissor, conta, algoritmo,
+dígitos e período. Editar abre direto na segunda aba, com os campos preenchidos.
+
+Excluir pede confirmação dentro da própria tela. Detalhes do formato e do
+armazenamento em `docs/autenticador.md`.
 
 ## Erros e avisos
 

@@ -9,7 +9,7 @@ roda de verdade (perfis de 128 e 256 MiB) nos testes de cofre.
 ```bash
 npm test               # execução única (o que o CI espera)
 npm run test:watch     # modo watch
-npm run test:coverage  # cobertura em coverage/ (limiar de 50%)
+npm run test:coverage  # cobertura em coverage/ (limiar de 90%)
 ```
 
 O `npm run check` **não** roda os testes; ele cobre tipos, lint, formato,
@@ -76,5 +76,17 @@ restaura timers e mocks a cada teste).
 ## Cobertura
 
 `vitest.config.mts` mede `src/**/*.{ts,tsx}` com o provedor v8, relatório em
-texto e HTML, e limiar de 50% para linhas, instruções, funções e ramos. Arquivos
-de tipo puro e HTML ficam de fora (`global.d.ts`, `index.html`).
+texto e HTML, e limiar de **90%** para linhas, comandos, funções e ramos. Abaixo
+disso o `npm run test:coverage` reprova, e o job "Testes e cobertura" do
+workflow `quality.yml` fica vermelho junto.
+
+Ficam de fora do denominador, com justificativa no próprio config:
+
+- `src/types/**` e `src/shared/index.ts`: com `verbatimModuleSyntax`,
+  `interface`, `type` e `export type {...} from` não emitem nada. São 0
+  comandos e 0 funções, então o 0% deles é artefato de medição e nenhum teste
+  os cobriria.
+- `src/node.loader.ts`: hook de resolução do `.ts` sem bundler. É verificado
+  por `tests/main/node-loader.test.ts`, que roda o Node de verdade em processo
+  filho, mas o v8 não mede cobertura entre processos.
+- `global.d.ts` e `index.html`: sem código executável.

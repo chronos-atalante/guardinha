@@ -32,6 +32,13 @@ const api: ElectronApi = {
     save: (entry) => ipcRenderer.invoke('entries:save', entry),
     remove: (id) => ipcRenderer.invoke('entries:delete', id),
   },
+  authenticator: {
+    list: () => ipcRenderer.invoke('authenticator:list'),
+    saveUri: (uri) => ipcRenderer.invoke('authenticator:save-uri', uri),
+    save: (token) => ipcRenderer.invoke('authenticator:save', token),
+    remove: (id) => ipcRenderer.invoke('authenticator:delete', id),
+    codes: () => ipcRenderer.invoke('authenticator:codes'),
+  },
   generator: {
     generate: (options) => ipcRenderer.invoke('generator:generate', options),
   },

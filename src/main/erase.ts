@@ -1,5 +1,5 @@
 import fs from 'fs-extra';
-import { containerFile, entriesDir } from '@zero/main/layout';
+import { authDir, containerFile, entriesDir } from '@zero/main/layout';
 import { markVaultDestroyed } from '@zero/main/erasure-state';
 import { SHRED_PASSES, shredDirectory, shredFile } from '@zero/main/shred';
 import { migrateHiddenLayout, vaultFiles } from '@zero/main/structure';
@@ -21,10 +21,16 @@ import { migrateHiddenLayout, vaultFiles } from '@zero/main/structure';
  *    blobs de chave**; um órfão de crash seria uma cópia completa do
  *    embrulho);
  * 2. todo arquivo de credencial (`.zke`, `.zke.tmp`, `.enc`), por shred;
- * 3. a pasta `.entries` em si;
+ * 3. todo arquivo de token de 2FA (`.zka`, `.zka.tmp`), por shred;
+ * 4. as pastas `.entries` e `.auth` em si;
  *
  * e nunca `vaultDir()` nem `.guardinha/`: a raiz é do sistema
  * (`root:root 0711`, criada no `postinst`) e o app não é dono dela.
+ *
+ * Os tokens de 2FA entram na mesma lista pelo motivo mais forte de todos: o
+ * segredo TOTP de uma conta vale tanto quanto a senha dela. Deixar `.auth` de
+ * pé num Cryptographic Erase seria apagar a fechadura e deixar a chave na
+ * parede.
  *
  * `migrateHiddenLayout()` roda antes, senão um cofre com o layout antigo fica
  * com `entries/` de pé e os nomes dos arquivos aparecem em disco.
@@ -53,8 +59,9 @@ export function eraseVault(): EraseResult {
   }
 
   // a pasta só sai se todos os arquivos dentro caíram (permissão, I/O ocupado)
-  if (fs.existsSync(entriesDir())) {
-    if (shredDirectory(entriesDir())) shredded++;
+  for (const dir of [entriesDir(), authDir()]) {
+    if (!fs.existsSync(dir)) continue;
+    if (shredDirectory(dir)) shredded++;
     else failed++;
   }
 

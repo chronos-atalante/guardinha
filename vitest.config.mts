@@ -38,12 +38,28 @@ export default defineConfig({
       reportsDirectory: 'coverage',
       reporter: ['text', 'html'],
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/renderer/src/global.d.ts', 'src/renderer/index.html'],
+      exclude: [
+        'src/renderer/src/global.d.ts',
+        'src/renderer/index.html',
+        // Declarações de tipo e barrels de reexport. Com `verbatimModuleSyntax`,
+        // `interface`, `type` e `export type {...} from` não emitem nada, então
+        // estes arquivos têm 0 statements e 0 funções: o 0% deles é artefato de
+        // medição, e nenhum teste os cobriria. Ficam de fora do denominador em
+        // vez de virar uma meta impossível.
+        'src/types/**',
+        'src/shared/index.ts',
+        // Hook de resolução do Node para rodar `.ts` sem bundler (`npm run
+        // dev`, `node --import`). Ele é verificado por `node-loader.test.ts`,
+        // que roda o Node de verdade em processo filho, mas o V8 não mede
+        // cobertura entre processos: manter o arquivo no relatório só faria
+        // o número deitar um teste que existe e passa.
+        'src/node.loader.ts',
+      ],
       thresholds: {
-        lines: 50,
-        statements: 50,
-        functions: 50,
-        branches: 50,
+        lines: 90,
+        statements: 90,
+        functions: 90,
+        branches: 90,
       },
     },
   },

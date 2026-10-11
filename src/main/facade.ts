@@ -1,4 +1,10 @@
-import { decryptRecord, encryptRecord, randomUuid } from '@zero/main/crypto';
+import {
+  decryptAuthRecord,
+  decryptRecord,
+  encryptAuthRecord,
+  encryptRecord,
+  randomUuid,
+} from '@zero/main/crypto';
 import {
   createVaultKey,
   deleteEntry,
@@ -6,6 +12,7 @@ import {
   readEntryPayload,
   writeEntryPayload,
 } from '@zero/main/entries-store';
+import { deleteAuth, listAuthIds, readAuthPayload, writeAuthPayload } from '@zero/main/auth-store';
 import {
   initManifest,
   isVaultDirUnavailable,
@@ -20,6 +27,8 @@ import { ensureVaultStructure } from '@zero/main/structure';
 import { cleanStaleTempFiles } from '@zero/main/entries-store';
 import { eraseVault } from '@zero/main/erase';
 import { currentMessages } from '@zero/main/i18n';
+import { OTP_ALGORITHMS } from '@zero/shared';
+import type { OtpAlgorithm } from '@zero/shared';
 import type { VaultContainerData } from '@zero/main/container';
 import type { Credential, EraseResult } from '@zero/types';
 
@@ -55,9 +64,56 @@ function asCredential(value: object): Credential | null {
 }
 
 /**
- * Fachada única do cofre sobre `fs-extra`, AES-256-GCM e o manifesto HMAC
- * (`.zke` e `.zkv`): `vault.ts` e `entries.ts` pedem operações de alto nível
- * aqui e nunca tocam sistema de arquivos, cifra ou pacote binário direto.
+ * Registro decifrado de um token de 2FA. Fica no main: o segredo é o que
+ * precisa de proteção e o renderer nunca o recebe (só os metadados e o código).
+ */
+export interface AuthSecret {
+  id: string;
+  issuer: string;
+  account: string;
+  algorithm: OtpAlgorithm;
+  digits: number;
+  period: number;
+  /** Base32 canônico, sem padding. */
+  secret: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Forma do registro decifrado; fora do contrato vira adulteração. */
+function asAuthSecret(value: object): AuthSecret | null {
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== 'string' ||
+    typeof record.issuer !== 'string' ||
+    typeof record.account !== 'string' ||
+    typeof record.secret !== 'string' ||
+    typeof record.digits !== 'number' ||
+    typeof record.period !== 'number' ||
+    typeof record.createdAt !== 'number' ||
+    typeof record.updatedAt !== 'number' ||
+    !OTP_ALGORITHMS.includes(record.algorithm as OtpAlgorithm)
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    issuer: record.issuer,
+    account: record.account,
+    algorithm: record.algorithm as OtpAlgorithm,
+    digits: record.digits,
+    period: record.period,
+    secret: record.secret,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  };
+}
+
+/**
+ * Fachada única do cofre sobre `fs-extra`, AES-256-GCM e o manifesto
+ * (`.zke`, `.zka` e `.zkv`): `vault.ts`, `entries.ts` e `authenticator.ts` pedem
+ * operações de alto nível aqui e nunca tocam sistema de arquivos, cifra ou
+ * pacote binário direto.
  */
 export class VaultStorageFacade {
   // ---------- Estrutura e localização ----------
@@ -146,6 +202,39 @@ export class VaultStorageFacade {
   /** Apaga o arquivo cifrado e re-sella o manifesto. */
   public removeRecord(id: string, vaultKey: Buffer): void {
     deleteEntry(id);
+    updateManifest(vaultKey);
+  }
+
+  // ---------- Tokens de 2FA (arquivos `.zka`) ----------
+
+  public listAuthIds(): string[] {
+    return listAuthIds();
+  }
+
+  /**
+   * Decifra o token e confere a forma. O segredo sai daqui apenas para o
+   * cálculo do código, dentro do main.
+   */
+  public readAuthSecret(id: string, vaultKey: Buffer): AuthSecret {
+    let record: AuthSecret | null;
+    try {
+      record = asAuthSecret(decryptAuthRecord(readAuthPayload(id), vaultKey));
+    } catch {
+      throw tampered();
+    }
+    if (record === null) throw tampered();
+    return record;
+  }
+
+  /** Cifra, grava o arquivo individual e re-sela o manifesto. */
+  public writeAuthSecret(record: AuthSecret, vaultKey: Buffer): void {
+    writeAuthPayload(record.id, encryptAuthRecord(record, vaultKey));
+    updateManifest(vaultKey);
+  }
+
+  /** Apaga o arquivo cifrado e re-sela o manifesto. */
+  public removeAuthSecret(id: string, vaultKey: Buffer): void {
+    deleteAuth(id);
     updateManifest(vaultKey);
   }
 

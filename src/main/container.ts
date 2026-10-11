@@ -51,7 +51,15 @@ const FLAG_MANIFEST = 0x08;
 export const FLAG_PANIC = 0x10;
 const FLAGS_ALL = FLAG_MASTER | FLAG_PIN | FLAG_RECOVERY | FLAG_MANIFEST | FLAG_PANIC;
 
-const MANIFEST_VERSION = 1;
+/**
+ * Versão do manifesto: 1 listava só credenciais, 2 acrescenta os tokens de
+ * 2FA. Um cofre gravado na v1 é lido sem campo novo (a pasta `.auth` simplesmente
+ * nasce vazia) e volta selado na v2 na próxima escrita, sem migração nem
+ * mudança no formato do container: o blob continua sendo um AES-256-GCM opaco.
+ */
+const MANIFEST_VERSION = 2;
+/** Manifesto anterior, sem a lista de tokens; ainda é lido. */
+const LEGACY_MANIFEST_VERSION = 1;
 
 /** Cabeçalho em bytes conforme a versão gravada. */
 function headerSize(version: number): number {
@@ -321,22 +329,40 @@ export function isLegacyEntryPayload(buffer: Buffer): boolean {
   return buffer.length > 0 && buffer[0] === 0x7b;
 }
 
-/** Sell a lista de ids do cofre com a própria chave (AES-256-GCM + HKDF). */
-export function sealManifest(vaultKey: Buffer, ids: string[]): SaltedPayload {
-  return encryptRecord({ v: MANIFEST_VERSION, ids }, vaultKey);
+/** Ids que o manifesto afirma existir: credenciais e tokens de 2FA. */
+export interface ManifestContent {
+  ids: string[];
+  authIds: string[];
 }
 
-/** Abre o manifesto; qualquer forma inesperada lança (fail-closed). */
-export function openManifest(vaultKey: Buffer, payload: SaltedPayload): string[] {
-  const value = decryptRecord(payload, vaultKey) as Record<string, unknown>;
-  const ids = value.ids;
-  if (value.v !== MANIFEST_VERSION || !Array.isArray(ids)) {
-    throw new Error('manifesto inválido');
-  }
+function stringList(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
   const result: string[] = [];
-  for (const id of ids) {
-    if (typeof id !== 'string' || id === '') throw new Error('manifesto inválido');
+  for (const id of value) {
+    if (typeof id !== 'string' || id === '') return null;
     result.push(id);
   }
   return result;
+}
+
+/** Sela os dois conjuntos de ids com a chave do cofre (AES-256-GCM + HKDF). */
+export function sealManifest(vaultKey: Buffer, ids: string[], authIds: string[]): SaltedPayload {
+  return encryptRecord({ v: MANIFEST_VERSION, ids, authIds }, vaultKey);
+}
+
+/**
+ * Abre o manifesto; qualquer forma inesperada lança (fail-closed).
+ *
+ * A v1 não tem `authIds` e significa lista vazia: ela foi gravada antes de o
+ * app saber gerar 2FA, então não há `.auth` que o manifesto precise cobrir.
+ */
+export function openManifest(vaultKey: Buffer, payload: SaltedPayload): ManifestContent {
+  const value = decryptRecord(payload, vaultKey) as Record<string, unknown>;
+  const ids = stringList(value.ids);
+  if (ids === null) throw new Error('manifesto inválido');
+  if (value.v === LEGACY_MANIFEST_VERSION) return { ids, authIds: [] };
+  if (value.v !== MANIFEST_VERSION) throw new Error('manifesto inválido');
+  const authIds = stringList(value.authIds);
+  if (authIds === null) throw new Error('manifesto inválido');
+  return { ids, authIds };
 }

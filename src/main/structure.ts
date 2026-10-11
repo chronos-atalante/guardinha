@@ -1,7 +1,7 @@
 import fs from 'fs-extra';
 import path from 'node:path';
 import { currentMessages } from '@zero/main/i18n';
-import { entriesDir, vaultDir } from '@zero/main/layout';
+import { authDir, entriesDir, vaultDir } from '@zero/main/layout';
 
 /**
  * Estrutura de diretórios do cofre: garante as pastas com o modo certo,
@@ -33,8 +33,10 @@ export function ensureVaultStructure(): void {
     migrateHiddenLayout();
     fs.ensureDirSync(vaultDir(), { mode: 0o700 });
     fs.ensureDirSync(entriesDir(), { mode: 0o700 });
+    fs.ensureDirSync(authDir(), { mode: 0o700 });
     fs.chmodSync(vaultDir(), 0o700);
     fs.chmodSync(entriesDir(), 0o700);
+    fs.chmodSync(authDir(), 0o700);
   } catch (error) {
     if (isPermissionError(error)) {
       throw new Error(currentMessages().errors.vaultDirUnavailable, { cause: error });
@@ -54,13 +56,16 @@ export function isVaultDirUnavailable(error: unknown): boolean {
 }
 
 /**
- * Todo arquivo regular do cofre, pasta do container e de `.entries` juntas.
- * Serve para o erasure e para a varredura de temporários órfãos, que precisam
- * ver o que existe de fato em vez do que o manifesto afirma.
+ * Todo arquivo regular do cofre: pasta do container, `.entries` e `.auth`
+ * juntas. Serve para o erasure e para a varredura de temporários órfãos, que
+ * precisam ver o que existe de fato em vez do que o manifesto afirma.
+ *
+ * `.auth` entra na mesma lista de propósito: o Cryptographic Erase não pode
+ * ter um diretório de arquivos que ele não apaga.
  */
 export function vaultFiles(): string[] {
   const files: string[] = [];
-  for (const dir of [vaultDir(), entriesDir()]) {
+  for (const dir of [vaultDir(), entriesDir(), authDir()]) {
     if (!fs.existsSync(dir)) continue;
     for (const name of fs.readdirSync(dir)) {
       const full = path.join(dir, name);

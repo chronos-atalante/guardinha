@@ -20,15 +20,16 @@ Camadas:
   `entries-store.ts`, `structure.ts` e `layout.ts`) sob a fachada (`facade.ts`,
   `VaultStorageFacade`), destruição segura (`shred.ts`, `erase.ts`,
   `erasure-state.ts`), clipboard (`clipboard.ts`, `SecureClipboardProxy`), trava
-  exponencial (`auth.ts`), sudo via PolicyKit (`privilege.ts`) e idioma
-  (`settings.ts`, `i18n.ts`).
+  exponencial (`auth.ts`), sudo via PolicyKit (`privilege.ts`), gerador de 2FA
+  (`authenticator.ts`, `auth-store.ts`, `totp.ts`) e idioma (`settings.ts`,
+  `i18n.ts`).
 - `src/messages/`: textos do app em pt-BR (canônico) e en (`@zero/messages`);
   guia em `docs/messages.md`.
 - `src/preload/`: única ponte da UI; monta e expõe `window.api` tipado.
 - `src/renderer/`: React; não acessa disco, rede nem Node direto.
 - `src/shared/`: regras puras compartilhadas por `main` e `renderer`
-  (`@zero/shared`, ex.: avaliação de força de credencial e a Strategy
-  `strengthFor`; sem Node nem DOM).
+  (`@zero/shared`, ex.: avaliação de força de credencial, a Strategy
+  `strengthFor`, Base32 e o formato `otpauth://`; sem Node nem DOM).
 - `src/types/`: contratos compartilhados (`@zero/types`, barrel).
 
 ## Arquitetura
@@ -42,8 +43,9 @@ Camadas:
 - Persistência: cofre em `/var/lib/.guardinha/.vault/` (fora de `~/`, 0700;
   **pastas ocultas por padrão**, prefixo `.`; a raiz é criada pelo `postinst`
   do `.deb`, `build/scripts/after-install.sh`) com `vault.zkv` binário (chaves
-  embrulhadas + trava exponencial + manifesto cifrado) e
-  `.entries/<uuid>.zke` individuais; a raiz `.guardinha/` é
+  embrulhadas + trava exponencial + manifesto cifrado),
+  `.entries/<uuid>.zke` individuais e `.auth/<uuid>.zka` de 2FA; a raiz
+  `.guardinha/` é
   `root:root 0711` sem listagem (navegar/excluir o topo exige sudo) e, quando
   falta permissão, `createVault` chama o helper do pacote via `pkexec`
   (ação PolicyKit `com.guardinha.keypass.setup-vault`; diálogo do sistema: a
@@ -58,10 +60,18 @@ Camadas:
   (`O_NOFOLLOW`, blocos de 64 KiB alternando aleatório e zero, `fsync` antes de
   fechar e `fsync` do diretório pai) e `erase.ts` orquestra o Cryptographic
   Erase apagando o `vault.zkv` (único lugar com a chave embrulhada), o `.tmp`
-  dele, todas as entradas e a pasta `.entries`. `erasure-state.ts` guarda o
+  dele, todas as entradas, todos os tokens de 2FA e as pastas `.entries` e
+  `.auth`. `erasure-state.ts` guarda o
   estado de destruição: depois de um erase, `writeVaultContainer` recusa
   escrever, para que nenhum read-modify-write recrie o container pela metade.
   `panicDestroy` (`vault.ts`) zera a chave da RAM **antes** de tocar no disco.
+- Gerador de 2FA (TOTP, RFC 6238): os tokens vivem em `.vault/.auth/<uuid>.zka`,
+  um arquivo cifrado por token em AES-256-GCM, com rótulo de domínio HKDF
+  próprio (`guardinha-vault-auth-v1`). **O segredo nunca sai do processo main**
+  (`authenticator.ts`): `window.api.authenticator` devolve metadados e o código
+  já calculado, nunca a chave, e `AuthToken` não tem o campo `secret`. O
+  algoritmo vem do serviço (SHA1 por padrão), não do app. Ver
+  `docs/autenticador.md`.
 - A chave do cofre vive em memória no main, dentro do Singleton
   `VaultSessionManager` (`session.ts`); ele zera o Buffer no lock, no auto-lock
   de 5 minutos e no encerramento do app. O temporizador de ociosidade mora no
@@ -105,7 +115,7 @@ Camadas:
   `src/node.loader.ts`; mudar um alias vale nos quatro.
 - Arquivos no teto de ~500 linhas; passou disso, extraia módulos.
 - `fs` no main fica nos módulos de persistência: `storage.ts` (o `vault.zkv`),
-  `entries-store.ts` (os `.zke`/`.enc`), `structure.ts` (as pastas) e
+  `entries-store.ts` (os `.zke`/`.enc`), `auth-store.ts` (os `.zka`), `structure.ts` (as pastas) e
   `shred.ts`. A exceção declarada é o `shred.ts`, que é primitiva de baixo
   nível: recebe sempre um caminho já validado por quem o compôs e não conhece o
   cofre. `layout.ts` não toca `fs`, só resolve caminhos.

@@ -6,8 +6,9 @@ import { currentMessages } from '@zero/main/i18n';
 import { eraseVault } from '@zero/main/erase';
 import { clearDestroyedFlag } from '@zero/main/erasure-state';
 import { cleanStaleTempFiles, writeEntryPayload } from '@zero/main/entries-store';
+import { writeAuthPayload } from '@zero/main/auth-store';
 import { saveEntry } from '@zero/main/entries';
-import { containerFile, entriesDir, vaultDir } from '@zero/main/layout';
+import { authDir, containerFile, entriesDir, vaultDir } from '@zero/main/layout';
 import {
   readAuthState,
   readVaultContainer,
@@ -81,8 +82,36 @@ describe('Cryptographic Erase (eraseVault)', () => {
     expect(fs.existsSync(entriesDir())).toBe(false);
   });
 
+  it('apaga os tokens de 2FA e a pasta .auth junto com o resto', () => {
+    // um segredo TOTP que sobrevive ao Cryptographic Erase é uma senha de
+    // servidor que sobrevive a ele, então esta é a asserção mais importante
+    // do arquivo depois da própria do container
+    seedVault([]);
+    writeAuthPayload('bbbbbbbb-1111-4111-8111-111111111111', DUMMY_PAYLOAD);
+    expect(fs.existsSync(authDir())).toBe(true);
+
+    const result = eraseVault();
+
+    expect(result.failed).toBe(0);
+    expect(fs.existsSync(authDir())).toBe(false);
+  });
+
+  it('apaga o .tmp de um token, que é uma cópia do segredo cifrado', () => {
+    seedVault([]);
+    const token = 'cccccccc-1111-4111-8111-111111111111';
+    writeAuthPayload(token, DUMMY_PAYLOAD);
+    const orphan = `${authDir()}/${token}.zka.tmp`;
+    fs.writeFileSync(orphan, 'copia', { mode: 0o600 });
+    expect(fs.existsSync(orphan)).toBe(true);
+
+    eraseVault();
+
+    expect(fs.existsSync(orphan)).toBe(false);
+  });
+
   it('não deixa nenhum arquivo legível na raiz do cofre', () => {
     seedVault(['aaaaaaaa-2222-4222-8222-222222222222']);
+    writeAuthPayload('dddddddd-1111-4111-8111-111111111111', DUMMY_PAYLOAD);
 
     eraseVault();
 

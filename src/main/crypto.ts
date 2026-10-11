@@ -85,9 +85,26 @@ export async function deriveKey(
   return Buffer.from(hashHex, 'hex');
 }
 
+/**
+ * Rótulos de domínio do HKDF. Cada tipo de arquivo tem um, então uma credencial
+ * e um token de 2FA com o mesmo salt nunca produzem a mesma chave, mesmo
+ * acidentalmente. Trocar um rótulo invalida os arquivos já gravados.
+ */
+const KEY_INFO_ENTRY = 'guardinha-vault-entry-v1';
+const KEY_INFO_AUTH = 'guardinha-vault-auth-v1';
+
+function deriveRecordKey(vaultKey: Buffer, salt: Buffer, info: string): Buffer {
+  return Buffer.from(crypto.hkdfSync('sha512', vaultKey, salt, info, 32));
+}
+
 /** Derivação de chave por arquivo (HKDF-SHA512 a partir da chave do cofre). */
 export function deriveEntryKey(vaultKey: Buffer, salt: Buffer): Buffer {
-  return Buffer.from(crypto.hkdfSync('sha512', vaultKey, salt, 'guardinha-vault-entry-v1', 32));
+  return deriveRecordKey(vaultKey, salt, KEY_INFO_ENTRY);
+}
+
+/** Mesma derivação, com o rótulo dos tokens de 2FA. */
+export function deriveAuthKey(vaultKey: Buffer, salt: Buffer): Buffer {
+  return deriveRecordKey(vaultKey, salt, KEY_INFO_AUTH);
 }
 
 export function randomBytes(size: number): Buffer {
@@ -101,10 +118,11 @@ export function randomUuid(): string {
 /**
  * Criptografia por arquivo individual com AES-256-GCM.
  * Salt (128-bits) e IV (128-bits) gerados por hardware para cada arquivo.
+ * O `info` separa os domínios do HKDF (ver `KEY_INFO_*` acima).
  */
-export function encryptRecord(data: object, key: Buffer): SaltedPayload {
+export function encryptRecord(data: object, key: Buffer, info = KEY_INFO_ENTRY): SaltedPayload {
   const salt = crypto.randomBytes(16);
-  const entryKey = deriveEntryKey(key, salt);
+  const entryKey = deriveRecordKey(key, salt, info);
   const iv = crypto.randomBytes(16);
 
   const cipher = crypto.createCipheriv('aes-256-gcm', entryKey, iv);
@@ -122,9 +140,13 @@ export function encryptRecord(data: object, key: Buffer): SaltedPayload {
   };
 }
 
-export function decryptRecord(payload: SaltedPayload, vaultKey: Buffer): object {
+export function decryptRecord(
+  payload: SaltedPayload,
+  vaultKey: Buffer,
+  info = KEY_INFO_ENTRY,
+): object {
   const salt = Buffer.from(payload.salt, 'hex');
-  const entryKey = deriveEntryKey(vaultKey, salt);
+  const entryKey = deriveRecordKey(vaultKey, salt, info);
   const decipher = crypto.createDecipheriv('aes-256-gcm', entryKey, Buffer.from(payload.iv, 'hex'));
   decipher.setAuthTag(Buffer.from(payload.tag, 'hex'));
 
@@ -133,6 +155,16 @@ export function decryptRecord(payload: SaltedPayload, vaultKey: Buffer): object 
   entryKey.fill(0);
 
   return JSON.parse(decrypted) as object;
+}
+
+/** Cifra um registro no domínio dos tokens de 2FA. */
+export function encryptAuthRecord(data: object, key: Buffer): SaltedPayload {
+  return encryptRecord(data, key, KEY_INFO_AUTH);
+}
+
+/** Decifra um registro no domínio dos tokens de 2FA. */
+export function decryptAuthRecord(payload: SaltedPayload, vaultKey: Buffer): object {
+  return decryptRecord(payload, vaultKey, KEY_INFO_AUTH);
 }
 
 /** Minúsculas, sem acento e com espaços simples (frase escrita pelo usuário). */

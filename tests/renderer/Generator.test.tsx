@@ -1,0 +1,176 @@
+import { render, screen } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { MessagesProvider } from '@zero/renderer/i18n';
+import { Generator } from '@zero/renderer/components/Generator';
+import { installApi } from '../mocks/api.ts';
+
+/**
+ * O gerador de senha é a tela que mais depende do main (a entropia sai do
+ * `crypto.randomBytes` do Node, não do `Math.random` do renderer). Os testes
+ * conferem o contrato com o cofre: o que a tela pede e o que ela faz com a
+ * resposta.
+ */
+
+function open(): ReturnType<typeof vi.fn> {
+  const onToast = vi.fn<(message: string) => void>();
+  render(
+    <MessagesProvider language="pt-BR">
+      <Generator onToast={onToast} />
+    </MessagesProvider>,
+  );
+  return onToast;
+}
+
+describe('Generator', () => {
+  it('abre com o tamanho padrão e as três categorias ligadas', () => {
+    open();
+    expect(screen.getByText('24 caracteres')).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: 'Tamanho da Senha' })).toHaveAttribute(
+      'aria-valuenow',
+      '24',
+    );
+    for (const label of ['Maiúsculas', 'Números', 'Símbolos']) {
+      expect(screen.getByRole('checkbox', { name: label })).toBeChecked();
+    }
+  });
+
+  it('gera a senha pedindo ao processo main, não no renderer', async () => {
+    const user = userEvent.setup();
+    const api = installApi();
+    const generate = vi.fn().mockResolvedValue('Senha-Forte-123!');
+    api.generator.generate = generate;
+    open();
+
+    await user.click(screen.getByRole('button', { name: /Gerar Senha Criptográfica/ }));
+
+    expect(generate).toHaveBeenCalledWith({
+      length: 24,
+      useUpper: true,
+      useNumbers: true,
+      useSymbols: true,
+      customEntropyWords: ['', '', '', '', ''],
+    });
+    expect(await screen.findByText('Senha-Forte-123!')).toBeInTheDocument();
+  });
+
+  it('manda as categorias desligadas e os cinco gostos digitados', async () => {
+    const user = userEvent.setup();
+    const api = installApi();
+    const generate = vi.fn().mockResolvedValue('x');
+    api.generator.generate = generate;
+    open();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Símbolos' }));
+    await user.type(screen.getByPlaceholderText('Objeto'), 'fone');
+    await user.type(screen.getByPlaceholderText('Número'), '2001');
+
+    await user.click(screen.getByRole('button', { name: /Gerar Senha Criptográfica/ }));
+
+    expect(generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        useSymbols: false,
+        customEntropyWords: ['fone', '2001', '', '', ''],
+      }),
+    );
+  });
+
+  it('muda o tamanho pelo slider', async () => {
+    const user = userEvent.setup();
+    const api = installApi();
+    const generate = vi.fn().mockResolvedValue('x');
+    api.generator.generate = generate;
+    open();
+
+    const slider = screen.getByRole('slider', { name: 'Tamanho da Senha' });
+    slider.focus();
+    await user.keyboard('{ArrowRight}');
+
+    await user.click(screen.getByRole('button', { name: /Gerar Senha Criptográfica/ }));
+
+    expect(generate).toHaveBeenCalledWith(expect.objectContaining({ length: 25 }));
+  });
+
+  it('recusa tamanho zero, sem chamar o cofre', async () => {
+    const user = userEvent.setup();
+    const api = installApi();
+    const generate = vi.fn().mockResolvedValue('x');
+    api.generator.generate = generate;
+    const onToast = open();
+
+    const slider = screen.getByRole('slider', { name: 'Tamanho da Senha' });
+    slider.focus();
+    await user.keyboard('{Home}'); // vai para o mínimo, que é 0
+
+    await user.click(screen.getByRole('button', { name: /Gerar Senha Criptográfica/ }));
+
+    expect(generate).not.toHaveBeenCalled();
+    expect(onToast).toHaveBeenCalledWith('Escolha um tamanho maior que 0.');
+  });
+
+  it('mede a força da senha gerada', async () => {
+    const user = userEvent.setup();
+    const api = installApi();
+    api.generator.generate = vi.fn().mockResolvedValue('aaaa');
+    open();
+
+    await user.click(screen.getByRole('button', { name: /Gerar Senha Criptográfica/ }));
+
+    expect(await screen.findByText('Muito fraca')).toBeInTheDocument();
+  });
+
+  it('copia a senha gerada e avisa', async () => {
+    const user = userEvent.setup();
+    const api = installApi();
+    api.generator.generate = vi.fn().mockResolvedValue('Senha-Copiada');
+    const copy = vi.fn().mockResolvedValue(undefined);
+    api.clipboard.copy = copy;
+    const onToast = open();
+
+    await user.click(screen.getByRole('button', { name: /Gerar Senha Criptográfica/ }));
+    await user.click(await screen.findByTitle('Copiar senha gerada'));
+
+    expect(copy).toHaveBeenCalledWith('Senha-Copiada');
+    expect(onToast).toHaveBeenCalledWith('Senha copiada.');
+  });
+
+  it('mostra o erro do cofre quando a geração falha', async () => {
+    const user = userEvent.setup();
+    const api = installApi();
+    api.generator.generate = vi.fn().mockRejectedValue(new Error('Parâmetros inválidos.'));
+    const onToast = open();
+
+    await user.click(screen.getByRole('button', { name: /Gerar Senha Criptográfica/ }));
+
+    expect(onToast).toHaveBeenCalledWith('Parâmetros inválidos.');
+  });
+
+  it('usa a mensagem padrão quando a falha não traz texto', async () => {
+    const user = userEvent.setup();
+    const api = installApi();
+    api.generator.generate = vi.fn().mockRejectedValue(new Error(''));
+    const onToast = open();
+
+    await user.click(screen.getByRole('button', { name: /Gerar Senha Criptográfica/ }));
+
+    expect(onToast).toHaveBeenCalledWith('Parâmetros inválidos para o gerador de senhas.');
+  });
+
+  it('avisa quando a cópia falha', async () => {
+    const user = userEvent.setup();
+    const api = installApi();
+    api.generator.generate = vi.fn().mockResolvedValue('Senha-Copiada');
+    api.clipboard.copy = vi.fn().mockRejectedValue(new Error('sem área de transferência'));
+    const onToast = open();
+
+    await user.click(screen.getByRole('button', { name: /Gerar Senha Criptográfica/ }));
+    await user.click(await screen.findByTitle('Copiar senha gerada'));
+
+    expect(onToast).toHaveBeenCalledWith('sem área de transferência');
+  });
+
+  it('não mostra senha nem botão de copiar antes de gerar', () => {
+    open();
+    expect(screen.queryByTitle('Copiar senha gerada')).not.toBeInTheDocument();
+  });
+});

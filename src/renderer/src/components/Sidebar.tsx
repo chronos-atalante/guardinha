@@ -1,10 +1,10 @@
 import type { JSX } from 'react';
-import { Dices, Film, Key, Lock, Settings, Shield, ShieldAlert } from 'lucide-react';
+import { Dices, Film, Key, Lock, Settings, Shield, ShieldAlert, Smartphone } from 'lucide-react';
 import { LanguageSelect } from '@zero/renderer/components/LanguageSelect';
 import { useMessages } from '@zero/renderer/i18n';
 import type { Language } from '@zero/types';
 
-export type TabType = 'home' | 'generator' | 'credits' | 'settings';
+export type TabType = 'home' | 'generator' | 'authenticator' | 'credits' | 'settings';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -16,11 +16,12 @@ interface SidebarProps {
   onDestroy: () => void;
 }
 
-type NavLabelKey = 'home' | 'generator' | 'credits' | 'settings';
+type NavLabelKey = 'home' | 'generator' | 'authenticator' | 'credits' | 'settings';
 
 const NAV_ITEMS: { tab: TabType; labelKey: NavLabelKey; icon: typeof Key }[] = [
   { tab: 'home', labelKey: 'home', icon: Key },
   { tab: 'generator', labelKey: 'generator', icon: Dices },
+  { tab: 'authenticator', labelKey: 'authenticator', icon: Smartphone },
   { tab: 'credits', labelKey: 'credits', icon: Film },
   { tab: 'settings', labelKey: 'settings', icon: Settings },
 ];

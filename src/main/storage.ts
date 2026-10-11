@@ -23,8 +23,9 @@ import {
   migrateHiddenLayout,
   vaultPath,
 } from '@zero/main/structure';
+import { listAuthIds } from '@zero/main/auth-store';
 import { listEntryIds } from '@zero/main/entries-store';
-import type { VaultContainerData, VaultKdfParams } from '@zero/main/container';
+import type { ManifestContent, VaultContainerData, VaultKdfParams } from '@zero/main/container';
 import type { SaltedPayload } from '@zero/main/crypto';
 
 /**
@@ -318,7 +319,7 @@ export function initManifest(vaultKey: Buffer): void {
   const data = readVaultContainer();
   if (data === null) return;
   if (data.manifest !== null) return;
-  data.manifest = sealManifest(vaultKey, listEntryIds());
+  data.manifest = sealManifest(vaultKey, listEntryIds(), listAuthIds());
   writeVaultContainer(data);
 }
 
@@ -326,13 +327,17 @@ export function initManifest(vaultKey: Buffer): void {
 export function updateManifest(vaultKey: Buffer): void {
   const data = readVaultContainer();
   if (data === null) return;
-  data.manifest = sealManifest(vaultKey, listEntryIds());
+  data.manifest = sealManifest(vaultKey, listEntryIds(), listAuthIds());
   writeVaultContainer(data);
 }
 
 /**
  * Confere manifesto × diretório: arquivo removido/injetado de fora do app
  * derruba a lista com o erro único de adulteração (fail-closed).
+ *
+ * Os tokens de 2FA entram na mesma conferência. Sem isso, apagar um `.zka` ou
+ * plantar o seu próprio passaria despercebido: o segredo TOTP trocado em
+ * silêncio é exatamente o ataque que o manifesto existe para fechar.
  */
 export function verifyManifest(vaultKey: Buffer): void {
   initManifest(vaultKey);
@@ -340,14 +345,18 @@ export function verifyManifest(vaultKey: Buffer): void {
   if (data === null) throw new Error(currentMessages().errors.vaultMissing);
   if (data.manifest === null) throw tampered();
 
-  let expected: string[];
+  let expected: ManifestContent;
   try {
     expected = openManifest(vaultKey, data.manifest);
   } catch {
     throw tampered();
   }
-  const actual = new Set(listEntryIds());
-  if (expected.length !== actual.size || expected.some((id) => !actual.has(id))) {
+
+  const sameSet = (claimed: string[], actual: string[]): boolean => {
+    const set = new Set(actual);
+    return claimed.length === set.size && claimed.every((id) => set.has(id));
+  };
+  if (!sameSet(expected.ids, listEntryIds()) || !sameSet(expected.authIds, listAuthIds())) {
     throw tampered();
   }
 }

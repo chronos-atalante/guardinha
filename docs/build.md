@@ -114,10 +114,79 @@ usuário instala. Com ele, a falha aparece no pull request.
 Secrets necessários: `GPG_PRIVATE_KEY` (e `GPG_PASSPHRASE`, se houver). As
 actions estão fixadas por SHA e atualizadas pelo Dependabot.
 
+## Versão do runner (`ubuntu-24.04`, não `ubuntu-latest`)
+
+Os sete jobs dos quatro workflows rodam em `ubuntu-24.04`, com o rótulo
+escrito à mão em vez do `ubuntu-latest`.
+
+Motivo: em **19/10/2026** o `ubuntu-latest` do GitHub passa a apontar para o
+Ubuntu 26.04 e a migração termina em 19/11/2026
+([actions/runner-images#14748](https://github.com/actions/runner-images/issues/14748)).
+Quem deixa `ubuntu-latest` não toma uma decisão: a imagem troca sozinha, e o
+que quebra aparece na pior hora. No caso daqui, o alvo não é quebramento
+comum, é o `build-deb` do `publish.yml`, que é o job que **gera o `.deb` que o
+usuário instala**. Trocar o ambiente de build no meio da linha 1.x muda glibc,
+`dpkg-deb` e o empacotamento do electron-builder sem ninguém ter decidido isso.
+
+O alvo de distribuição é o Linux Mint 22.X, que descende da série 24.04, então
+o 24.04 também é o ambiente mais próximo do destino real.
+
+**Para sair do 24.04**, não basta trocar o rótulo: rodar a linha inteira em
+`ubuntu-26.04` e conferir, nesta ordem:
+
+1. `npm run check` e `npm run test:coverage` (os testes rodam Argon2id de 128 e
+   256 MiB de verdade, então pegam diferença de runtime e de memória);
+2. `npm run build && npx electron-builder --linux deb` e conferir o `.deb`
+   gerado: `dpkg-deb -I` para os metadados, o perfil AppArmor aplicado em
+   `build/scripts/after-install.sh` e a instalação em uma VM limpa do Mint 22.X;
+3. o postinst e o prerm, que rodam como root (`fakeroot` só cobre o empacotamento).
+
+Só depois disso o `ubuntu-26.04` entra nos workflows, com o mesmo peso de
+decisão que teve o `ubuntu-24.04`.
+
+Sobre o Dependabot: ele **não** é o que segura nada aqui. Os workflows fixam as
+actions por SHA completo, e o Dependabot (`github-actions`) só abre PR para
+mover esses pins. Se ninguém mesclar esses PRs, nada quebra: os pins atuais
+(`checkout` v7.0.1, `setup-node` v7.0.0, `codeql-action` v4.38.2,
+`upload-artifact` v4.6.2) seguem funcionando. O que para de acontecer é a
+chegada automática de correção de segurança das actions, e isso é revisão de
+ponta, não automação. Já a migração do runner é mudança da **imagem**, invisível
+para o Dependabot: foi por isso que o `ubuntu-latest` precisou ser fixado à mão.
+
+## Gate da branch de trabalho
+
+`.github/workflows/quality.yml` confere a `developer` enquanto o código está
+sendo escrito, que é o oposto do `publish.yml` (que só roda na `main`, no
+momento em que a versão sai). Sem ele, erro de tipo, formatação quebrada,
+dependência vulnerável, teste vermelho ou cobertura abaixo de 90% só apareceriam
+depois do merge.
+
+| Gatilho                    | O que roda                                            |
+| -------------------------- | ----------------------------------------------------- |
+| push na `developer`        | "Verificar qualidade" e "Testes e cobertura"          |
+| PR para `main`/`developer` | os dois, e é o par de status checks que trava o merge |
+| execução manual            | os dois, para conferir na mão um passo local duvidoso |
+
+Dois jobs independentes, para a falha apontar o culpado:
+
+- **Verificar qualidade**: `npm run check` (tipos, lint, formato, auditoria OSV,
+  shellcheck). Instala `bin/osv-scanner` e `bin/shellcheck` do mesmo jeito que o
+  `publish.yml`, com as mesmas versões fixadas.
+- **Testes e cobertura**: `npm run test:coverage`, cujo limiar de 90% mora em
+  `vitest.config.mts`. Publica a tabela no resumo da execução e sobe o relatório
+  HTML como artefato (`cobertura-relatorio`, 14 dias), que é o que serve para
+  achar a linha que derrubou o número.
+
+Para o merge ficar travado de verdade, marque os dois status checks como
+obrigatórios nas regras de proteção da `main` (Settings > Branches > Branch
+protection rules). Sem isso o workflow é informativo: ele roda, mas ninguém é
+obrigado a esperar.
+
 ## Outros workflows
 
-| Arquivo          | Papel                                        |
-| ---------------- | -------------------------------------------- |
-| `codeql.yml`     | CodeQL em push/PR para `main` e semanalmente |
-| `agradecer.yml`  | Comentário de agradecimento ao mesclar um PR |
-| `dependabot.yml` | PRs semanais para dependências npm e actions |
+| Arquivo          | Papel                                                        |
+| ---------------- | ------------------------------------------------------------ |
+| `quality.yml`    | Gate de tipos, lint, formato, OSV e cobertura na `developer` |
+| `codeql.yml`     | CodeQL em push/PR para `main` e semanalmente                 |
+| `agradecer.yml`  | Comentário de agradecimento ao mesclar um PR                 |
+| `dependabot.yml` | PRs semanais para dependências npm e actions                 |
