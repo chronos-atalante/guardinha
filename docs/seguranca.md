@@ -34,10 +34,10 @@ quem precisa mexer no código saber onde cada medida mora e o que ela protege.
 | Declaração do perfil no empacotamento                    | `package.json` (bloco `build.deb.appArmorProfile`)                          |
 | Guarda de origem em todo canal IPC                       | `src/main/index.ts` (`assertAppFrame`)                                      |
 | Navegação presa, `window.open`, permissões web negadas   | `src/main/index.ts`                                                         |
-| Renderer servido por `guardinha://`                      | `src/main/index.ts` (`registerAppProtocol`)                                 |
+| Renderer servido por `guardinha://`                      | `src/main/protocol.ts` (`registerAppProtocol`)                              |
 | Fuses do Electron                                        | `package.json` (bloco `build.electronFuses`)                                |
 | CSP e preload com `contextIsolation`/`sandbox`           | `src/renderer/index.html`, `src/preload/index.ts`                           |
-| Limpeza do clipboard em 30 s no processo main            | `src/main/clipboard.ts` (`SecureClipboardProxy`)                            |
+| Limpeza do clipboard em 30 s, e na hora ao sair          | `src/main/clipboard.ts` (`SecureClipboardProxy`)                            |
 | Erros do cofre sem eco de senha, PIN ou frase            | `src/main/vault.ts`, `src/main/entries.ts`, `src/messages/`                 |
 | Auditoria de dependências e de scripts                   | `.osv-scanner.toml`, `npm run lint:shell`, `.github/workflows/codeql.yml`   |
 

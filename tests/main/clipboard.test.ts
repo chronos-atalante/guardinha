@@ -60,11 +60,30 @@ describe('SecureClipboardProxy', () => {
     expect(clipboard.writeText).toHaveBeenLastCalledWith('');
   });
 
-  it('dispose cancela a limpeza pendente', async () => {
+  it('dispose limpa na hora e cancela a limpeza pendente', async () => {
+    clipboard.readText.mockResolvedValue('senha');
     await proxy.copy('senha');
-    proxy.dispose();
 
+    await proxy.dispose();
+    expect(clipboard.writeText).toHaveBeenLastCalledWith('');
+
+    // e o temporizador cancelado não repete a limpeza
     await vi.advanceTimersByTimeAsync(30_000);
+    expect(clipboard.writeText).toHaveBeenCalledTimes(2);
+  });
+
+  it('dispose preserva o clipboard quando o usuário já copiou outra coisa', async () => {
+    await proxy.copy('senha');
+    clipboard.readText.mockResolvedValue('outra-coisa');
+
+    await proxy.dispose();
+
+    expect(clipboard.writeText).not.toHaveBeenCalledWith('');
     expect(clipboard.writeText).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispose sem nada copiado não escreve no clipboard', async () => {
+    await proxy.dispose();
+    expect(clipboard.writeText).not.toHaveBeenCalled();
   });
 });

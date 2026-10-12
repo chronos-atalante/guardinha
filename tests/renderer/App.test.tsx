@@ -38,7 +38,11 @@ describe('App', () => {
 
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Senhas' }, { timeout: 5000 });
+    // `Home` começa em "abrindo o cofre" e só mostra o heading depois da
+    // lista; sob a suíte inteira rodando em paralelo esse IPC passa do segundo
+    // padrão do Testing Library. O limite alto só custa tempo no caminho da
+    // falha: enquanto o heading não aparece, a espera continua.
+    await screen.findByRole('heading', { name: 'Senhas' }, { timeout: 15_000 });
     expect(await screen.findByText('GitHub')).toBeInTheDocument();
   });
 

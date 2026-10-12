@@ -72,7 +72,10 @@ describe('HOTP (RFC 4226)', () => {
 
   it('falha explicitamente se a implementação HMAC devolver digest truncado', () => {
     const hmac = crypto.createHmac('sha1', SEED_SHA1);
-    vi.spyOn(hmac, 'digest').mockReturnValue(Buffer.alloc(0));
+    // `Hmac.digest` é sobrecarregado (Buffer sem argumento, texto com encoding) e
+    // o `mockReturnValue` adota a última sobrecarga, que devolve string. O que o
+    // `totp.ts` chama é a forma sem argumento, que devolve o Buffer.
+    vi.spyOn(hmac, 'digest').mockReturnValue(Buffer.alloc(0) as unknown as string);
     vi.spyOn(crypto, 'createHmac').mockReturnValue(hmac);
 
     expect(() => hotp(SEED_SHA1, 0, 6, 'SHA1')).toThrow('digest HMAC truncado');

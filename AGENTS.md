@@ -15,14 +15,16 @@ Camadas:
   chave em memória (`session.ts`, Singleton `VaultSessionManager`), atividade
   e auto-lock (`activity.ts`, Observer `ActivityMonitor`), desbloqueio
   (`unlock.ts`, cadeia de manipuladores), desembrulho de chaves
-  (`unwrapping.ts`, mapa por tipo de credencial), CRUD de credenciais
-  (`entries.ts`), criptografia (`crypto.ts`), persistência (`storage.ts`,
+  (`unwrapping.ts`, registro por tipo de credencial), CRUD de credenciais
+  (`entries.ts`), criptografia (`crypto.ts`), gerador de senha
+  (`generator.ts`), formatos em disco (`container.ts`), scheme `guardinha://`
+  e guarda de origem do IPC (`protocol.ts`), persistência (`storage.ts`,
   `entries-store.ts`, `structure.ts` e `layout.ts`) sob a fachada (`facade.ts`,
   `VaultStorageFacade`), destruição segura (`shred.ts`, `erase.ts`,
   `erasure-state.ts`), clipboard (`clipboard.ts`, `SecureClipboardProxy`), trava
   exponencial (`auth.ts`), sudo via PolicyKit (`privilege.ts`), gerador de 2FA
-  (`authenticator.ts`, `auth-store.ts`, `totp.ts`) e idioma (`settings.ts`,
-  `i18n.ts`).
+  (`authenticator.ts`, `auth-store.ts`, `totp.ts`), logs do Chromium
+  (`logging.ts`) e idioma (`settings.ts`, `i18n.ts`).
 - `src/messages/`: textos do app em pt-BR (canônico), zh-CN, ko, ja e en
   (`@zero/messages`); guia em `docs/messages.md`.
 - `src/preload/`: única ponte da UI; monta e expõe `window.api` tipado.
@@ -91,19 +93,27 @@ Camadas:
   da chave do cofre (construtor privado, atalho `vaultSession()`).
 - Fachada: `VaultStorageFacade` (`src/main/facade.ts`) concentra `fs-extra`,
   AES-256-GCM e o manifesto; `vault.ts` e `entries.ts` pedem operações de alto
-  nível. `src/preload/index.ts` também é fachada (monta `window.api`).
+  nível, inclusive o `erase`. `src/preload/index.ts` também é fachada (monta
+  `window.api`).
 - Proxy: `SecureClipboardProxy` (`src/main/clipboard.ts`) envolve o clipboard
-  nativo com expiração em 30 s.
+  nativo com expiração em 30 s. É proxy no sentido do GoF, isto é, substituto
+  do assunto (`electron.clipboard`), e não `new Proxy`: o objeto nativo não
+  tem contrato para implementar e o wrapper acrescenta `dispose`.
 - Chain of Responsibility: `unlock.ts` encadeia trava exponencial, formato,
-  derivação Argon2id e integridade; `vault.ts` só chama `runUnlockChain`.
-- Factory Method: `unwrapping.ts` resolve o embrulho/desembrulho da chave por
-  tipo de credencial (`keyUnwrapperFor(kind)`, mapa `UNWRAPPERS`).
+  derivação Argon2id e integridade; `vault.ts` só chama `runUnlockChain`. Na
+  cadeia, `null` significa "passe adiante", `undefined` significa "pare sem
+  resposta" (o corte da autodestruição) e o resto encerra o desbloqueio.
 - Strategy: `src/shared/strategy.ts` (`strengthFor(kind)`) escolhe a régua de
   força por tipo de credencial; as funções puras continuam em `strength.ts`.
+  `src/main/unwrapping.ts` (`keyUnwrapperFor(kind)`) faz o mesmo pelo custo do
+  Argon2id: um embrulhador só, parametrizado pelo tipo, num registro.
 - Observer: `activity.ts` (`ActivityMonitor`) notifica o Singleton e o
-  entrypoint na ociosidade; cada ouvinte se inscreve e cancela sozinho.
-- Barrel exports: `index.ts` só re-exporta (exceto os entrypoints
-  `src/main/index.ts` e `src/preload/index.ts`).
+  entrypoint na ociosidade; `subscribe()` devolve o cancelador, para que quem
+  assina possa se desinscrever (no app, o monitor é singleton de processo e
+  ninguém precisa cancelar).
+- Barrel exports: `index.ts` só re-exporta. Exceções: os entrypoints
+  `src/main/index.ts` e `src/preload/index.ts`, e `src/messages/index.ts`, que
+  é o registro de idiomas e a fábrica do bundle.
 - Tipagem de domínio por interfaces/uniões fechadas em `src/types/`
   (`UnlockKind`, `VaultStatus`), nunca strings soltas.
 - UI composicional: estado no topo (`App.tsx`), telas e modais controlados
@@ -118,9 +128,11 @@ Camadas:
 - Arquivos no teto de ~500 linhas; passou disso, extraia módulos.
 - `fs` no main fica em `storage.ts` (`vault.zkv`), `entries-store.ts` (`.zke`),
   `auth-store.ts` (`.zka`), `structure.ts` (pastas), `settings.ts`
-  (preferências não sensíveis em `settings.json`) e `shred.ts`. Este último é
-  uma primitiva de baixo nível: recebe um caminho validado por quem o compôs e
-  não conhece o cofre. `layout.ts` não toca `fs`, só resolve caminhos.
+  (preferências não sensíveis em `settings.json`), `shred.ts`, `erase.ts`
+  (a checagem do que sobrou) e `protocol.ts` (o servidor de assets do scheme).
+  `shred.ts` é uma primitiva de baixo nível: recebe um caminho validado por
+  quem o compôs e não conhece o cofre. `layout.ts` não toca `fs`, só resolve
+  caminhos, e `container.ts` não toca `fs` nem caminho, só `Buffer`.
 - Type safety: `strict`, `noUncheckedIndexedAccess`,
   `exactOptionalPropertyTypes`, `noImplicitReturns` e `verbatimModuleSyntax`
   (import de tipo sempre `import type`). Sem `any`, sem cast gratuito.
@@ -141,7 +153,10 @@ Camadas:
   scripts de `build/scripts/`). Obrigatório antes de concluir qualquer
   mudança. As duas ferramentas ficam em `bin/` e não entram no git:
   `bin/osv-scanner` (copiar de `Chronos/Biblioteca/bin/`) e `bin/shellcheck`
-  (release `koalaman/shellcheck` no GitHub).
+  (release `koalaman/shellcheck` no GitHub). O lint também guarda as fronteiras
+  que este arquivo descreve: a lista de módulos autorizados a tocar `fs` e a
+  proibição de `fs`/`child_process` no renderer e no preload estão em
+  `no-restricted-imports`, no `eslint.config.mjs`.
 - `npm test` (ou `test:coverage`): Vitest em `tests/**`.
 - `npm run test:mutation` (ou `test:mutation:plan`): teste de mutação em
   `tools/mutation/`; ver `docs/mutation.md`. É lento (cerca de 90 min) e não

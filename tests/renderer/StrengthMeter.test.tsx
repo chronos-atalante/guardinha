@@ -13,7 +13,7 @@ import type { StrengthResult } from '@zero/shared';
  */
 
 function result(overrides: Partial<StrengthResult> = {}): StrengthResult {
-  return { score: 0, level: 'veryWeak', reasons: [], ...overrides };
+  return { score: 0, level: 'veryWeak', blocked: false, reasons: [], ...overrides };
 }
 
 function segments(container: HTMLElement): string[] {

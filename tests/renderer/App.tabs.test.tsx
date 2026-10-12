@@ -35,9 +35,10 @@ describe('App: navegação entre abas', () => {
 
     render(<App />);
     // `Home` começa em "abrendo o cofre" e só mostra o heading depois da
-    // lista; sob a suíte inteira rodando em paralelo esse IPC leva mais que o
-    // segundo padrão do Testing Library
-    await screen.findByRole('heading', { name: 'Senhas' }, { timeout: 5000 });
+    // lista; sob a suíte inteira rodando em paralelo esse IPC passa do segundo
+    // padrão do Testing Library. O limite alto só custa tempo no caminho da
+    // falha: enquanto o heading não aparece, a espera continua.
+    await screen.findByRole('heading', { name: 'Senhas' }, { timeout: 15_000 });
 
     await user.click(screen.getByRole('button', { name: 'Gerador de Senhas' }));
     expect(await screen.findByRole('heading', { name: 'Gerador de Senhas' })).toBeInTheDocument();

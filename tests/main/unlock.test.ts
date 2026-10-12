@@ -1,6 +1,7 @@
 // @vitest-environment node
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { loadAuthState, registerFailedAttempt, resetAttempts, statusFrom } from '@zero/main/auth';
+import { writeAuthState } from '@zero/main/storage';
 import { vaultStorage } from '@zero/main/facade';
 import { createVault, unlock } from '@zero/main/vault';
 import { runUnlockChain } from '@zero/main/unlock';
@@ -45,6 +46,13 @@ describe('runUnlockChain (Chain of Responsibility)', () => {
       await createVault({ masterPassword: MASTER, pin: PIN, recoveryPhrase: PHRASE });
     }
   }, 120_000);
+
+  // `registerFailedAttempt` grava o `nukeLimit` do container no cofre de verdade
+  // e `resetAttempts` o preserva, então os testes de corte não podem deixar a
+  // autodestruição ligada para os arquivos seguintes
+  afterEach(() => {
+    writeAuthState({ attempts: 0, lockUntil: null, attemptsMaster: 0, nukeLimit: 0 });
+  });
 
   it('a cadeia libera a chave com a credencial certa', async () => {
     const container = await makeContainer();
@@ -129,6 +137,44 @@ describe('runUnlockChain (Chain of Responsibility)', () => {
     const result = await runUnlockChain(context(PIN, 'pin', container));
 
     expect(result).toMatchObject({ ok: false, error: currentMessages().errors.wrongPin });
+  });
+
+  it('o corte da autodestruição para a cadeia e conta a tentativa uma vez só', async () => {
+    // `nukeLimit` no container liga a autodestruição; o `1` faz a primeira
+    // falha da senha mestra cruzar o limite.
+    resetAttempts();
+    const container = await makeContainer();
+    const armed: VaultContainerData = { ...container, nukeLimit: 1 };
+    // senha mestra malformada: recusa no validador de formato, que tem
+    // manipulador depois dele, é onde a cadeia precisa parar de vez
+    const ctx = context('curta', 'master', armed);
+
+    const result = await runUnlockChain(ctx);
+
+    // parou sem resposta e avisou quem chamou para destruir o cofre
+    expect(result).toBeNull();
+    expect(ctx.nuked).toBe(true);
+    expect(ctx.vaultKey).toBeUndefined();
+    // uma tentativa do usuário, um incremento: na cadeia `null` significa
+    // "passe adiante", então devolver `null` no corte deixaria a sequência
+    // seguir até a integridade e contaria a mesma falha outra vez
+    expect(loadAuthState().attempts).toBe(1);
+    expect(loadAuthState().attemptsMaster).toBe(1);
+  });
+
+  it('o corte da autodestruição também segura a senha mestra bem formada', async () => {
+    resetAttempts();
+    const container = await makeContainer();
+    const armed: VaultContainerData = { ...container, nukeLimit: 1 };
+    // 24 caracteres, formato válido: a recusa só vem da chave errada, no fim
+    const ctx = context('senha-mestra-errada-1234', 'master', armed);
+
+    const result = await runUnlockChain(ctx);
+
+    expect(result).toBeNull();
+    expect(ctx.nuked).toBe(true);
+    expect(loadAuthState().attempts).toBe(1);
+    expect(loadAuthState().attemptsMaster).toBe(1);
   });
 
   it('statusFrom expõe tentativa, espera e travado', () => {

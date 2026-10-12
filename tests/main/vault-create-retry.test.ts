@@ -26,13 +26,17 @@ describe('retentativa de criação após setup privilegiado', () => {
 
   it('usa erro interno se o setup privilegiado falha com valor não Error', async () => {
     const m = currentMessages();
+    // o valor lançado é `unknown` de propósito: é a forma de reproduzir a
+    // rejeição de baixo nível que o `instanceof Error` de `vault.ts` precisa
+    // absorver sem deixar `undefined` vazar para a mensagem da interface
+    const falhaSemError: unknown = 'falha sem Error';
     vi.spyOn(vaultStorage, 'exists').mockReturnValue(false);
     vi.spyOn(vaultStorage, 'ensureStructure')
       .mockImplementationOnce(() => {
         throw new Error(m.errors.vaultDirUnavailable);
       })
       .mockImplementationOnce(() => {
-        throw 'falha sem Error';
+        throw falhaSemError;
       });
     vi.spyOn(privilege, 'setupVaultDirectory').mockReturnValue(true);
 

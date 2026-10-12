@@ -34,7 +34,7 @@ antiga, e toda gravação re-sella o manifesto de integridade.
 ## Gerador de senhas
 
 A aba **Gerador de Senhas** chama `window.api.generator.generate()` e monta a
-senha no processo main (`generateHighEntropyPassword`, em `src/main/crypto.ts`):
+senha no processo main (`generateHighEntropyPassword`, em `src/main/generator.ts`):
 
 | Opção            | Faixa / padrão                               |
 | ---------------- | -------------------------------------------- |
