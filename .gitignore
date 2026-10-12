@@ -4,6 +4,8 @@ release/
 # workspace temporário do repo APT flat gerado no CI (publish.yml)
 apt/
 coverage/
+implementar/
+mutation/
 *.deb
 .DS_Store
 .dev-vault/

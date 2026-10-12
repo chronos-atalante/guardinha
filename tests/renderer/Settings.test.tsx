@@ -201,9 +201,7 @@ describe('Configurações: autodestruição por tentativas', () => {
     window.api.vault.setNukeLimit = vi.fn().mockRejectedValue(new Error(''));
 
     render(<Settings />);
-    await user.click(
-      await screen.findByRole('button', { name: /Desativar autodestruição/i }),
-    );
+    await user.click(await screen.findByRole('button', { name: /Desativar autodestruição/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/erro/i);
   });

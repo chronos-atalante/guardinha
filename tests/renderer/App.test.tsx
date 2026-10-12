@@ -50,9 +50,7 @@ describe('App', () => {
 
     await user.click(screen.getByTitle('Copiar usuário'));
 
-    expect(
-      await screen.findByText('Copiado para a área de transferência.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Copiado para a área de transferência.')).toBeInTheDocument();
   });
 
   it('atualiza o status após o evento de auto-lock enviado pelo main', async () => {

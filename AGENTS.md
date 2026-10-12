@@ -143,6 +143,9 @@ Camadas:
   `bin/osv-scanner` (copiar de `Chronos/Biblioteca/bin/`) e `bin/shellcheck`
   (release `koalaman/shellcheck` no GitHub).
 - `npm test` (ou `test:coverage`): Vitest em `tests/**`.
+- `npm run test:mutation` (ou `test:mutation:plan`): teste de mutação em
+  `tools/mutation/`; ver `docs/mutation.md`. É lento (cerca de 90 min) e não
+  entra no `check` nem no CI.
 - `npm run dev` / `build` / `dist`: desenvolvimento, build, `.deb`.
 - `python3 build/make-icon.py`: regenera `build/icon.png` (PIL); é o `icon`
   do electron-builder e da janela.

@@ -199,3 +199,19 @@ describe('validações de formato', () => {
     expect(validateDomainFormat('não é domínio')).toBe(false);
   });
 });
+
+describe('contador de tentativas', () => {
+  it('só cruza o limite de autodestruição quando o limite está ligado', () => {
+    // `nukeLimit > 0` é o que separa "sem limite" de "com limite": com o `> 0`
+    // virando `>= 1` (ou o `0` virando `1`), um cofre sem limite cruzaria na
+    // primeira tentativa de senha mestra errada.
+    const desligado = registerFailedAttempt('master', 0);
+    expect(desligado.crossed).toBe(false);
+
+    const ligado = registerFailedAttempt('master', 3);
+    expect(ligado.crossed).toBe(false);
+
+    const noLimite = registerFailedAttempt('master', 3);
+    expect(noLimite.crossed).toBe(true);
+  });
+});

@@ -10,13 +10,17 @@ têm timeout de 120 s.
 ## Como rodar
 
 ```bash
-npm test               # execução única (o que o CI espera)
-npm run test:watch     # modo watch
-npm run test:coverage  # cobertura em coverage/ (limiar de 90%)
+npm test                  # execução única (o que o CI espera)
+npm run test:watch        # modo watch
+npm run test:coverage     # cobertura em coverage/ (limiar de 90%)
+npm run test:mutation     # teste de mutação (ver docs/mutation.md)
+npm run test:mutation:plan  # só o plano da varredura, sem executar
 ```
 
 O `npm run check` **não** roda os testes; ele cobre tipos, lint, formato,
 auditoria de dependências e shellcheck. Rode os dois antes de concluir.
+O `npm run check` e o `npm test` também não rodam mutação: a varredura é lenta
+e o score é uma medida de tendência, não um portão.
 
 ## Arquivos
 
@@ -103,6 +107,13 @@ restaura timers e mocks a cada teste).
   (`createVault` custa três derivações Argon2id, uns 45 s). Crie uma vez,
   fotografe o `vault.zkv` e restaure a foto antes de cada cenário; é o que
   `tests/main/panic.test.ts` faz.
+
+## Mutação
+
+A cobertura de linha diz que uma linha rodou; o teste de mutação diz que a
+suíte perceberia se ela fizesse outra coisa. O runner é próprio
+(`tools/mutation/`) e o escopo, os operadores e as garantias estão em
+`docs/mutation.md`.
 
 ## Cobertura
 

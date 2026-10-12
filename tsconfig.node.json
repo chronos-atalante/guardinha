@@ -6,6 +6,8 @@
   "include": [
     "electron.vite.config.mts",
     "vitest.config.mts",
+    "vitest.mutation.config.mts",
+    "tools/mutation/**/*",
     "src/node.loader.ts",
     "src/main/**/*",
     "src/messages/**/*",

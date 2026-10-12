@@ -84,3 +84,11 @@ describe('ActivityMonitor (Observer)', () => {
     expect(second).toHaveBeenCalledWith('idle-timeout');
   });
 });
+
+describe('período ocioso do cofre', () => {
+  it('é de 5 minutos, como manda AGENTS.md', () => {
+    // O temporizador usa relógio falso, então qualquer valor serviria nos testes
+    // acima: sem esta afirmação, trocar 5 por 30 passaria a suíte inteira.
+    expect(IDLE_LOCK_MS).toBe(5 * 60 * 1000);
+  });
+});

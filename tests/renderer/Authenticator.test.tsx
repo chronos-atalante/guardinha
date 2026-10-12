@@ -226,9 +226,12 @@ describe('tela do verificador 2FA', () => {
     );
 
     expect(await screen.findByText('111111')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(onToast).toHaveBeenCalledWith('Falha ao atualizar códigos.');
-    }, { timeout: 4000 });
+    await waitFor(
+      () => {
+        expect(onToast).toHaveBeenCalledWith('Falha ao atualizar códigos.');
+      },
+      { timeout: 4000 },
+    );
   });
 
   it('abre o formulário para criar e para editar', async () => {

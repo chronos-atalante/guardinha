@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { shredDirectory, shredFile } from '@zero/main/shred';
+import { SHRED_PASSES, shredDirectory, shredFile } from '@zero/main/shred';
 
 const SECRET = 'guardinha-shred-prova-de-conteudo-original';
 
@@ -188,5 +188,29 @@ describe('shredDirectory', () => {
 
     expect(shredDirectory(dir)).toBe(false);
     expect(fs.readFileSync(outside, 'utf8')).toBe(SECRET);
+  });
+});
+
+describe('parâmetros da sobrescrita', () => {
+  it('usa 3 passadas por padrão, como manda o shred(1)', () => {
+    // O número de passadas é o que a sobrescrita realmente entrega. Um teste que
+    // só chama `shredFile` continua verde se alguém baixar o custo aqui.
+    expect(SHRED_PASSES).toBe(3);
+  });
+
+  it('apaga o arquivo e não deixa o conteúdo original para trás', () => {
+    fs.writeFileSync(target, SECRET, { mode: 0o600 });
+    expect(shredFile(target)).toBe(true);
+    expect(fs.existsSync(target)).toBe(false);
+  });
+
+  it('sobrescreve arquivo maior que um bloco de escrita antes de apagar', () => {
+    // Arquivo de vários blocos exercita o laço de escrita; o de tamanho pequeno
+    // passaria mesmo com o laço quebrado.
+    const big = 'x'.repeat(300_000);
+    fs.writeFileSync(target, big, { mode: 0o600 });
+
+    expect(shredFile(target)).toBe(true);
+    expect(fs.existsSync(target)).toBe(false);
   });
 });

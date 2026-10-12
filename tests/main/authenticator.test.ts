@@ -1,6 +1,7 @@
 // @vitest-environment node
 import fs from 'node:fs';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { AuthToken } from '@zero/types';
 import { authDir, vaultDir } from '@zero/main/layout';
 import {
   currentCodes,
@@ -9,7 +10,8 @@ import {
   saveToken,
   saveTokenFromUri,
 } from '@zero/main/authenticator';
-import { encryptAuthRecord } from '@zero/main/crypto';
+import { OTP_PERIOD_RANGE, OTP_SECRET_MIN_BYTES, base32Encode } from '@zero/shared';
+import { encryptAuthRecord, randomBytes } from '@zero/main/crypto';
 import { writeAuthPayload } from '@zero/main/auth-store';
 import { currentMessages } from '@zero/main/i18n';
 import { vaultStorage } from '@zero/main/facade';
@@ -159,15 +161,13 @@ describe('tokens de 2FA', () => {
 
   it('trata id vazio como criação e recusa id malformado na atualização', () => {
     const [created] = saveToken({ ...draft(), id: '' });
-    expect(created?.id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-    );
+    expect(created?.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect(() => saveToken({ ...draft(), id: '../../fora' })).toThrow(
       currentMessages().errors.invalidId,
     );
-    expect(() =>
-      saveToken({ ...draft(), id: '00000000-0000-4000-8000-000000000000' }),
-    ).toThrow(currentMessages().errors.authTokenNotFound);
+    expect(() => saveToken({ ...draft(), id: '00000000-0000-4000-8000-000000000000' })).toThrow(
+      currentMessages().errors.authTokenNotFound,
+    );
     if (created !== undefined) removeToken(created.id);
   });
 
@@ -304,4 +304,66 @@ describe('tokens de 2FA', () => {
     expect(updated[0]?.createdAt).toBe(created?.createdAt);
     removeToken(id);
   });
+});
+
+describe('regras do token que a suíte media mal', () => {
+  it('exige emissor ou conta, mas aceita qualquer um dos dois sozinho', () => {
+    // `&&` aqui vira `||` sem quebrar nenhum teste antigo: os dois campos
+    // vinham preenchidos. A regra é: rótulo vazio nos dois é inválido.
+    const semNada = (): AuthToken[] => saveToken(draft({ issuer: '   ', account: '' }));
+    const soEmissor = saveToken(draft({ issuer: 'GitHub', account: '' }));
+    const soConta = saveToken(draft({ issuer: '', account: 'alice' }));
+
+    expect(semNada).toThrow();
+    expect(soEmissor[0]?.issuer).toBe('GitHub');
+    expect(soConta[0]?.account).toBe('alice');
+    for (const token of [soEmissor[0], soConta[0]]) {
+      if (token !== undefined) removeToken(token.id);
+    }
+  });
+
+  it('aceita o período nos dois extremos da faixa e recusa o valor seguinte', () => {
+    const [min, max] = OTP_PERIOD_RANGE;
+    const ok = saveToken(draft({ period: min }));
+    const alsoOk = saveToken(draft({ period: max }));
+
+    expect(ok[0]?.period).toBe(min);
+    expect(alsoOk[0]?.period).toBe(max);
+    for (const token of [ok[0], alsoOk[0]]) {
+      if (token !== undefined) removeToken(token.id);
+    }
+
+    expect(() => saveToken(draft({ period: min - 1 }))).toThrow();
+    expect(() => saveToken(draft({ period: max + 1 }))).toThrow();
+  });
+
+  it('aceita o segredo do tamanho mínimo e recusa um byte a menos', () => {
+    // O limite é o ponto exato: `>=` trocado por `>` deixaria passar segredo
+    // curto, que é justamente o que o serviço rejeitaria depois.
+    const minimo = base32Encode(randomBytes(OTP_SECRET_MIN_BYTES));
+    const curto = base32Encode(randomBytes(OTP_SECRET_MIN_BYTES - 1));
+    const [aceito] = saveToken(draft({ secret: minimo }));
+
+    expect(aceito).toBeDefined();
+    if (aceito !== undefined) removeToken(aceito.id);
+    expect(() => saveToken(draft({ secret: curto }))).toThrow();
+  });
+
+  it('ordena a lista do token mais recente para o mais antigo', () => {
+    const [antigo] = saveToken(draft({ account: 'antigo' }));
+    const idAntigo = antigo?.id ?? '';
+    vi.setSystemTime(new Date(Date.now() + 60_000));
+    const [novo] = saveToken(draft({ account: 'novo' }));
+    const idNovo = novo?.id ?? '';
+    vi.useRealTimers();
+
+    const order = listTokens().map((token) => token.id);
+    expect(order.indexOf(idNovo)).toBeLessThan(order.indexOf(idAntigo));
+    removeToken(idAntigo);
+    removeToken(idNovo);
+  });
+});
+
+afterAll(() => {
+  vi.useRealTimers();
 });

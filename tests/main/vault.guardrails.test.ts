@@ -28,6 +28,7 @@ import type { PersistedAuthState } from '@zero/main/storage';
 const MASTER = 'senha-mestra-guardinha24';
 const PIN = '49201733';
 const OTHER_PIN = '73918264';
+const m = currentMessages();
 const PHRASE = 'Na feira de hoje o cavalo branco comeu exatamente doze cenouras gigantes';
 
 const NEUTRAL: PersistedAuthState = {
@@ -214,5 +215,18 @@ describe('cofre ausente', () => {
     writeAuthState({ ...NEUTRAL, attempts: 2, lockUntil: Date.now() + 1000 });
     expect(getStatus().exists).toBe(false);
     expect(fs.existsSync(containerFile())).toBe(false);
+  });
+});
+
+describe('piso do limite de autodestruição', () => {
+  it('recusa 1 e aceita 0 como desligado', () => {
+    // O `limit > 0` é o que separa "desligado" (0) de "abaixo do piso" (1..49).
+    // Com o `0` virando `1`, um limite de 1 passaria a ser aceito e a
+    // autodestruição dispararia na primeira senha mestra errada.
+    expect(setNukeLimit(1)).toEqual(
+      expect.objectContaining({ ok: false, error: m.errors.nukeLimitTooLow }),
+    );
+    expect(setNukeLimit(0).ok).toBe(true);
+    expect(panicStatus().nukeLimit).toBe(0);
   });
 });

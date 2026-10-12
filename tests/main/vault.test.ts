@@ -12,6 +12,7 @@ import {
   getStatus,
   isUnlocked,
   lock,
+  panicStatus,
   requireSessionKey,
   resetPin,
   unlock,
@@ -44,6 +45,10 @@ describe('ciclo de vida do cofre (integração)', () => {
     expect(container?.methods.master?.kdf).toMatchObject(KDF_CREDENTIAL);
     expect(container?.methods.recovery?.kdf).toMatchObject(KDF_CREDENTIAL);
     expect(container?.methods.pin?.kdf).not.toEqual(container?.methods.master?.kdf);
+
+    // o contador de senha mestra e o limite de autodestruição nascem zerados:
+    // um cofre novo que já contasse tentativa destruiria o dado do usuário
+    expect(panicStatus()).toMatchObject({ nukeLimit: 0, attemptsMaster: 0, hasPanicPin: false });
   });
 
   it('2. recusa recriar um cofre existente', async () => {

@@ -159,8 +159,7 @@ describe('canais de gravação do autenticador', () => {
 
   it('preserva erros de sessão bloqueada ao salvar URI, token ou excluir token', () => {
     const locked = currentMessages().errors.vaultLocked;
-    const uri =
-      'otpauth://totp/GitHub:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=GitHub';
+    const uri = 'otpauth://totp/GitHub:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=GitHub';
     expect(() => call('authenticator:save-uri', appFrame(), uri)).toThrow(locked);
     expect(() => call('authenticator:save', appFrame(), {})).toThrow(locked);
     expect(() =>

@@ -16,6 +16,7 @@ continua sendo a porta de entrada. Aqui mora o detalhe.
 | `messages.md`     | i18n pt-BR, zh-CN, ko, ja e en, contrato e como traduzir                     |
 | `build.md`        | Build, geração do `.deb`, scripts de instalação, fuses e CI                  |
 | `testes.md`       | Suíte Vitest: o que cada arquivo cobre e como rodar                          |
+| `mutation.md`     | Testes de mutação: score, operadores e como a varredura é barata             |
 | `seguranca.md`    | Mapa de cada medida de segurança para o arquivo que a implementa             |
 
 Arquivos de governança da raiz: `LICENSE` (MIT), `CONTRIBUTING.md` (fluxo de

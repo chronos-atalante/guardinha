@@ -86,9 +86,7 @@ describe('KeyUnwrapperFactory (Factory Method)', () => {
       payload: encryptRecord({ key: 'curta' }, derived),
     };
 
-    expect(() => keyUnwrapperFor('master').unwrap(method, derived)).toThrow(
-      'container corrompido',
-    );
+    expect(() => keyUnwrapperFor('master').unwrap(method, derived)).toThrow('container corrompido');
   });
 
   it('o payload do embrulho só abre com a chave de trabalho certa', async () => {
@@ -97,5 +95,18 @@ describe('KeyUnwrapperFactory (Factory Method)', () => {
     // o payload guarda a chave em hex cifrado; sem o derived certo ele não abre
     expect(() => decryptRecord(method.payload, Buffer.alloc(32, 1))).toThrow();
     derived.fill(0);
+  });
+});
+
+describe('perfis de KDF por método de desbloqueio', () => {
+  it('usa o perfil da senha mestra para master e recovery, e o do PIN para pin e panic', () => {
+    // O roteamento é o que dá ao PIN de pânico o mesmo custo do PIN legítimo.
+    // Inverter a escolha faria o atalho do coator ficar mais barato (ou mais
+    // caro) que o caminho honesto, que é justamente o que não pode acontecer.
+    expect(keyUnwrapperFor('master').kdf).toMatchObject(KDF_CREDENTIAL);
+    expect(keyUnwrapperFor('recovery').kdf).toMatchObject(KDF_CREDENTIAL);
+    expect(keyUnwrapperFor('pin').kdf).toMatchObject(KDF_PIN);
+    expect(keyUnwrapperFor('panic').kdf).toMatchObject(KDF_PIN);
+    expect(keyUnwrapperFor('master').kdf.algo).toBe('argon2id');
   });
 });

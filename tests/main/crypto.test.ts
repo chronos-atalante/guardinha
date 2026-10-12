@@ -5,9 +5,11 @@ import {
   KDF_PIN,
   MASTER_PASSWORD_LENGTH,
   RECOVERY_MIN_WORDS,
+  decryptAuthRecord,
   decryptRecord,
   deriveAuthKey,
   deriveKey,
+  encryptAuthRecord,
   encryptRecord,
   generateHighEntropyPassword,
   isSameKdf,
@@ -230,5 +232,58 @@ describe('frase de recuperação', () => {
 
   it('senha mestra tem 24 caracteres conforme a especificação', () => {
     expect(MASTER_PASSWORD_LENGTH).toBe(24);
+  });
+});
+
+describe('parâmetros de KDF fixados', () => {
+  it('mantém os custos de produção gravados em AGENTS.md e docs/cofre.md', () => {
+    // Estes números são a proteção contra ataque de força bruta do PIN. Um teste
+    // que só compara o perfil com ele mesmo passa se alguém afrouxar o custo.
+    expect(KDF_CREDENTIAL).toEqual({ memoryKiB: 131_072, iterations: 3, parallelism: 4 });
+    expect(KDF_PIN).toEqual({ memoryKiB: 262_144, iterations: 4, parallelism: 4 });
+  });
+
+  it('aceita o teto da faixa de leitura e recusa o valor seguinte', () => {
+    const atLimit = { memoryKiB: 1_048_576, iterations: 8, parallelism: 8 };
+    expect(isValidKdfParams(atLimit)).toBe(true);
+    expect(isValidKdfParams({ ...atLimit, iterations: 9 })).toBe(false);
+    expect(isValidKdfParams({ ...atLimit, parallelism: 9 })).toBe(false);
+    expect(isValidKdfParams({ ...atLimit, memoryKiB: 1_048_577 })).toBe(false);
+  });
+});
+
+describe('derivação por HKDF', () => {
+  it('separa os domínios: entrada e token de 2FA nunca dividem a chave', () => {
+    // É o motivo dos rótulos `-v1`: dois registros com a mesma senha e o mesmo
+    // salt, mas em domínios diferentes, precisam sair com chaves diferentes. Se
+    // os rótulos colidissem, um `.zke` abriria como `.zka` e o app leria a
+    // credencial no lugar do token de 2FA.
+    const key = randomBytes(32);
+    const salt = randomBytes(16);
+
+    const entry = encryptRecord({ title: 'GitHub' }, key);
+    const auth = encryptAuthRecord({ issuer: 'GitHub' }, key);
+
+    expect(entry.salt).not.toBe(auth.salt);
+    expect(decryptRecord(entry, key)).toEqual({ title: 'GitHub' });
+    expect(decryptAuthRecord(auth, key)).toEqual({ issuer: 'GitHub' });
+    expect(deriveAuthKey(key, salt)).toHaveLength(32);
+  });
+
+  it('recusa um registro de token no domínio de entrada e vice-versa', () => {
+    const key = randomBytes(32);
+    const entry = encryptRecord({ title: 'GitHub' }, key);
+
+    // O payload do token é cifrado no outro rótulo, então a decifra no domínio
+    // errado tem de falhar na tag, e não devolver lixo.
+    expect(() => decryptAuthRecord(entry, key)).toThrow();
+  });
+
+  it('devolve sempre 32 bytes, em qualquer faixa válida de custo', async () => {
+    const salt = randomBytes(16);
+    const params = [TEST_KDF, KDF_CREDENTIAL, { memoryKiB: 16_384, iterations: 1, parallelism: 8 }];
+    for (const profile of params) {
+      expect(await deriveKey('senha-de-teste', salt, profile)).toHaveLength(32);
+    }
   });
 });

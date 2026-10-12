@@ -111,3 +111,29 @@ describe('tempo restante', () => {
     expect(totpRemainingMs(29_999, 30)).toBe(1);
   });
 });
+
+describe('passo de tempo do TOTP', () => {
+  it('usa um passo mínimo de 1 s quando o período não faz sentido', () => {
+    // Período zero ou fracionário viraria divisão por zero (ou passo fracionário)
+    // e o código sairia errado. O piso de 1 s é o que segura isso.
+    expect(totpStep(1_000_000, 0)).toBe(1_000);
+    expect(totpStep(1_000_000, 0.4)).toBe(1_000);
+  });
+
+  it('mantém a contagem regressiva entre 0 e o período inteiro', () => {
+    // A barra do renderer desenha esse número: negativo faz a barra estourar,
+    // maior que o período faz o código parecer que ainda não virou.
+    for (const period of [15, 30, 90]) {
+      for (const offset of [0, 1, period * 500 - 1, period * 1000 - 1]) {
+        const remaining = totpRemainingMs(offset, period);
+        expect(remaining).toBeGreaterThanOrEqual(0);
+        expect(remaining).toBeLessThanOrEqual(period * 1000);
+      }
+    }
+  });
+
+  it('zera a contagem quando o tempo já passou do período', () => {
+    expect(totpRemainingMs(-5_000, 30)).toBeGreaterThanOrEqual(0);
+    expect(totpRemainingMs(-5_000, 0)).toBeGreaterThanOrEqual(0);
+  });
+});

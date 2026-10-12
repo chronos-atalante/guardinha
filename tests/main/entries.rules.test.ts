@@ -113,3 +113,21 @@ describe('entries: remoção', () => {
     expect(() => listEntries()).not.toThrow();
   });
 });
+
+describe('entries: ordem da lista', () => {
+  it('mostra a credencial editada por último, não por primeiro', () => {
+    // A lista da tela começa pelo que o usuário mexeu por último. Um `+` no
+    // comparador inverteria a ordem sem quebrar nenhum teste antigo, que só
+    // conferia que as ids estavam na lista.
+    const [primeira] = saveEntry(entry({ title: 'Ordem-a' }));
+    const [segunda] = saveEntry(entry({ title: 'Ordem-b' }));
+    const idPrimeira = primeira?.id ?? '';
+    const idSegunda = segunda?.id ?? '';
+
+    const ids = listEntries().map((item) => item.id);
+    expect(ids.indexOf(idSegunda)).toBeLessThan(ids.indexOf(idPrimeira));
+
+    removeEntry(idPrimeira);
+    removeEntry(idSegunda);
+  });
+});
