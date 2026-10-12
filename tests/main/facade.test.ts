@@ -66,6 +66,19 @@ describe('VaultStorageFacade (fachada de persistência)', () => {
     }
   });
 
+  it('converte falha ao decifrar uma credencial em erro de adulteração', () => {
+    const key = requireSessionKey();
+    const id = vaultStorage.newId();
+    writeEntryPayload(id, encryptRecord(record(id), Buffer.alloc(32, 1)));
+
+    try {
+      expect(() => vaultStorage.readRecord(id, key)).toThrow(TAMPERED);
+    } finally {
+      deleteEntry(id);
+      updateManifest(key);
+    }
+  });
+
   it('responde adulteração quando um arquivo entra fora do manifesto', () => {
     const key = requireSessionKey();
     const id = vaultStorage.newId();
@@ -85,5 +98,9 @@ describe('VaultStorageFacade (fachada de persistência)', () => {
     expect(vaultStorage.listIds()).toEqual([]);
     expect(vaultStorage.path()).not.toBe('');
     expect(vaultStorage.createKey()).toHaveLength(32);
+  });
+
+  it('encaminha a destruição criptográfica pela fachada', () => {
+    expect(vaultStorage.erase()).toMatchObject({ failed: 0 });
   });
 });

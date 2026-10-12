@@ -1,10 +1,11 @@
 // @vitest-environment node
 import fs from 'fs-extra';
 import path from 'node:path';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { currentMessages } from '@zero/main/i18n';
 import { clearDestroyedFlag } from '@zero/main/erasure-state';
 import { vaultSession } from '@zero/main/session';
+import * as unwrapping from '@zero/main/unwrapping';
 import {
   createVault,
   getStatus,
@@ -166,6 +167,19 @@ describe('redefinição de PIN', () => {
     expect(result).toEqual(
       expect.objectContaining({ ok: false, error: currentMessages().errors.wrongRecovery }),
     );
+  });
+
+  it('reembrulha a frase quando o perfil de custo está desatualizado', async () => {
+    writeAuthState(NEUTRAL);
+    const recovery = unwrapping.keyUnwrapperFor('recovery');
+    const checkKdf = vi.spyOn(unwrapping, 'isKdfUpToDate').mockReturnValue(false);
+    const wrap = vi.spyOn(recovery, 'wrap');
+
+    const result = await resetPin({ phrase: PHRASE, newPin: OTHER_PIN });
+
+    expect(result.ok).toBe(true);
+    expect(checkKdf).toHaveBeenCalledWith('recovery', expect.any(Object));
+    expect(wrap).toHaveBeenCalledOnce();
   });
 });
 

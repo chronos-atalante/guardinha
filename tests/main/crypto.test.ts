@@ -6,6 +6,7 @@ import {
   MASTER_PASSWORD_LENGTH,
   RECOVERY_MIN_WORDS,
   decryptRecord,
+  deriveAuthKey,
   deriveKey,
   encryptRecord,
   generateHighEntropyPassword,
@@ -83,6 +84,18 @@ describe('encryptRecord / decryptRecord (AES-256-GCM)', () => {
     expect(payload.iv).toHaveLength(32); // 128 bits em hex
     expect(payload.tag).toHaveLength(32); // 128 bits em hex
     expect(decryptRecord(payload, key)).toEqual(data);
+  });
+
+  describe('deriveAuthKey (HKDF de tokens 2FA)', () => {
+    it('deriva uma chave determinística de 32 bytes no domínio dos tokens', () => {
+      const key = randomBytes(32);
+      const salt = randomBytes(16);
+      const first = deriveAuthKey(key, salt);
+
+      expect(first).toHaveLength(32);
+      expect(first.equals(deriveAuthKey(key, salt))).toBe(true);
+      expect(first.equals(key)).toBe(false);
+    });
   });
 
   it('falha com a chave errada', () => {

@@ -10,6 +10,7 @@ import { readVaultContainer, writeVaultContainer } from '@zero/main/storage';
 import {
   createVault,
   getStatus,
+  isUnlocked,
   lock,
   requireSessionKey,
   resetPin,
@@ -35,6 +36,7 @@ describe('ciclo de vida do cofre (integração)', () => {
     });
     expect(result.ok).toBe(true);
     expect(result.status).toMatchObject({ exists: true, locked: false, attempts: 0 });
+    expect(isUnlocked()).toBe(true);
 
     // cada método nasce com o custo do Argon2id adequado ao segredo (v3)
     const container = readVaultContainer();
@@ -184,6 +186,7 @@ describe('ciclo de vida do cofre (integração)', () => {
     expect(() => removeEntry('../../vault.zkv')).toThrow(currentMessages().errors.invalidId);
 
     lock();
+    expect(isUnlocked()).toBe(false);
     expect(() => listEntries()).toThrow(currentMessages().errors.vaultLocked);
   });
 

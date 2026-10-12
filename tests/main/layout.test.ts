@@ -1,7 +1,7 @@
 // @vitest-environment node
 import fs from 'fs-extra';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { vaultDir, entriesDir } from '@zero/main/layout';
 import {
   ensureVaultStructure,
@@ -90,6 +90,15 @@ describe('structure:erro de permissão', () => {
     expect(isVaultDirUnavailable(new Error(m.errors.vaultDirUnavailable))).toBe(true);
     expect(isVaultDirUnavailable(new Error('outro erro'))).toBe(false);
     expect(isVaultDirUnavailable('texto')).toBe(false);
+  });
+
+  it('propaga erro de estrutura que não seja de permissão sem traduzi-lo', () => {
+    const error = new Error('disco indisponível');
+    vi.spyOn(fs, 'ensureDirSync').mockImplementationOnce(() => {
+      throw error;
+    });
+
+    expect(() => ensureVaultStructure()).toThrow(error);
   });
 });
 

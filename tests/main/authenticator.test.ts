@@ -1,6 +1,6 @@
 // @vitest-environment node
 import fs from 'node:fs';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { authDir, vaultDir } from '@zero/main/layout';
 import {
   currentCodes,
@@ -14,6 +14,7 @@ import { writeAuthPayload } from '@zero/main/auth-store';
 import { currentMessages } from '@zero/main/i18n';
 import { vaultStorage } from '@zero/main/facade';
 import { createVault, requireSessionKey } from '@zero/main/vault';
+import { vaultSession } from '@zero/main/session';
 
 const MASTER = 'senha-mestra-guardinha24';
 const PIN = '49201733';
@@ -56,6 +57,12 @@ describe('tokens de 2FA', () => {
     expect(authDir().startsWith(vaultDir())).toBe(true);
     expect(authDir().endsWith('.auth')).toBe(true);
     expect(fs.statSync(authDir()).mode & 0o777).toBe(0o700);
+  });
+
+  it('não expõe tokens nem códigos na sessão decoy', () => {
+    vi.spyOn(vaultSession(), 'isDecoy').mockReturnValue(true);
+    expect(listTokens()).toEqual([]);
+    expect(currentCodes()).toEqual([]);
   });
 
   it('salva a partir do endereço otpauth:// e devolve os metadados', () => {
@@ -127,12 +134,66 @@ describe('tokens de 2FA', () => {
   });
 
   it('recusa parâmetros fora da faixa', () => {
+    expect(() => saveToken(draft({ algorithm: 'MD5' }))).toThrow(
+      currentMessages().errors.invalidAuthToken,
+    );
     expect(() => saveToken(draft({ digits: 7 }))).toThrow(
       currentMessages().errors.invalidAuthToken,
     );
     expect(() => saveToken(draft({ period: 0 }))).toThrow(
       currentMessages().errors.invalidAuthToken,
     );
+    expect(() => saveToken(draft({ period: 301 }))).toThrow(
+      currentMessages().errors.invalidAuthToken,
+    );
+    expect(() => saveToken(draft({ period: 30.5 }))).toThrow(
+      currentMessages().errors.invalidAuthToken,
+    );
+  });
+
+  it('recusa token sem emissor e sem conta', () => {
+    expect(() => saveToken(draft({ issuer: ' ', account: '  ' }))).toThrow(
+      currentMessages().errors.invalidAuthToken,
+    );
+  });
+
+  it('trata id vazio como criação e recusa id malformado na atualização', () => {
+    const [created] = saveToken({ ...draft(), id: '' });
+    expect(created?.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+    expect(() => saveToken({ ...draft(), id: '../../fora' })).toThrow(
+      currentMessages().errors.invalidId,
+    );
+    expect(() =>
+      saveToken({ ...draft(), id: '00000000-0000-4000-8000-000000000000' }),
+    ).toThrow(currentMessages().errors.authTokenNotFound);
+    if (created !== undefined) removeToken(created.id);
+  });
+
+  it('pula a geração quando um segredo legado não pode ser decodificado', () => {
+    const key = requireSessionKey();
+    const id = vaultStorage.newId();
+    writeAuthPayload(
+      id,
+      encryptAuthRecord(
+        {
+          id,
+          issuer: 'Legado',
+          account: 'conta',
+          algorithm: 'SHA1',
+          digits: 6,
+          period: 30,
+          secret: '!',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        key,
+      ),
+    );
+    vaultStorage.updateManifest(key);
+    expect(currentCodes().some((code) => code.id === id)).toBe(false);
+    removeToken(id);
   });
 
   it('recusa endereço otpauth:// inválido com a mensagem do formato', () => {
@@ -148,6 +209,32 @@ describe('tokens de 2FA', () => {
     const key = requireSessionKey();
     const id = vaultStorage.newId();
     writeAuthPayload(id, encryptAuthRecord({ id, issuer: 'X', digits: 'seis' }, key));
+    expect(() => vaultStorage.readAuthSecret(id, key)).toThrow(TAMPERED);
+    removeToken(id);
+  });
+
+  it('converte falha ao decifrar um token em erro de adulteração', () => {
+    const key = requireSessionKey();
+    const id = vaultStorage.newId();
+    writeAuthPayload(
+      id,
+      encryptAuthRecord(
+        {
+          id,
+          issuer: 'GitHub',
+          account: 'alice',
+          algorithm: 'SHA1',
+          digits: 6,
+          period: 30,
+          secret: STRONG_SECRET,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        Buffer.alloc(32, 1),
+      ),
+    );
+    vaultStorage.updateManifest(key);
+
     expect(() => vaultStorage.readAuthSecret(id, key)).toThrow(TAMPERED);
     removeToken(id);
   });

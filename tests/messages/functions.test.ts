@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { en } from '@zero/messages/en';
+import { ja } from '@zero/messages/ja';
+import { ko } from '@zero/messages/ko';
 import { ptBR } from '@zero/messages/pt-BR';
+import { zhCN } from '@zero/messages/zh-CN';
 
 /**
  * O teste de paridade (`parity.test.ts`) confere chaves, tipos e aridade, mas
@@ -37,6 +40,13 @@ function functionsOf(bundle: object): [string, (...args: unknown[]) => string][]
 
 const PT_FUNCTIONS = functionsOf(ptBR);
 const EN_FUNCTIONS = functionsOf(en);
+const LOCALIZED_BUNDLES = [
+  ['pt-BR', ptBR],
+  ['en', en],
+  ['ja', ja],
+  ['ko', ko],
+  ['zh-CN', zhCN],
+] as const;
 
 describe('funções de mensagem', () => {
   it('o bundle tem funções parametrizadas para exercitar', () => {
@@ -93,6 +103,20 @@ describe('funções de mensagem', () => {
       }
     }
     expect(mismatched).toEqual([]);
+  });
+
+  it.each(LOCALIZED_BUNDLES)('%s executa todas as funções de mensagem', (_language, bundle) => {
+    for (const [path, fn] of functionsOf(bundle)) {
+      const args = SAMPLE.slice(0, fn.length);
+      expect(fn(...args), path).toEqual(expect.any(String));
+      expect(fn(...args).trim(), path).not.toBe('');
+    }
+  });
+
+  it.each(LOCALIZED_BUNDLES)('%s formata versões ausentes e explícitas', (_language, bundle) => {
+    const unsupported = bundle.errors.vaultUnsupportedVersion;
+    expect(unsupported()).toContain('Guardinha');
+    expect(unsupported(5)).toContain('v5');
   });
 
   it('nenhuma mensagem vazia ou com marcador quebrado', () => {

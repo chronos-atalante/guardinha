@@ -72,6 +72,12 @@ describe('parseOtpAuthUri', () => {
     ).toBe(STRONG_SECRET);
   });
 
+  it('preserva campos do rótulo cujo escape percentual está malformado', () => {
+    expect(
+      parseOtpAuthUri(`otpauth://totp/%ZZ:conta%?secret=${STRONG_SECRET}`),
+    ).toMatchObject({ issuer: '%ZZ', account: 'conta%' });
+  });
+
   it('recusa emissor que não bate com o rótulo', () => {
     // sinal de endereço remontado ou colado de dois serviços: melhor recusar
     expect(

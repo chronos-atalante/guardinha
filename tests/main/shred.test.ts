@@ -117,6 +117,18 @@ describe('shredFile', () => {
     expect(fs.existsSync(target)).toBe(false);
   });
 
+  it('fecha o arquivo e preserva o original quando fsync falha', () => {
+    fs.writeFileSync(target, SECRET, { mode: 0o600 });
+    const close = vi.spyOn(fs, 'closeSync');
+    vi.spyOn(fs, 'fsyncSync').mockImplementationOnce(() => {
+      throw new Error('fsync indisponível');
+    });
+
+    expect(shredFile(target, 1)).toBe(false);
+    expect(close).toHaveBeenCalledOnce();
+    expect(fs.existsSync(target)).toBe(true);
+  });
+
   it('sobrescreve arquivo maior que um bloco, mantendo o tamanho', () => {
     const big = crypto.randomBytes(200_000);
     fs.writeFileSync(target, big, { mode: 0o600 });

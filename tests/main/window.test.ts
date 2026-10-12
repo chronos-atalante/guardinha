@@ -62,6 +62,21 @@ describe('guardas de navegação e sessão', () => {
     expect(shell.openExternal).toHaveBeenCalledTimes(1);
   });
 
+  it('registra erro de falha ao abrir URL externa sem abrir janela', async () => {
+    const win = await waitForWindow();
+    const handler = win.webContents.setWindowOpenHandler.mock.calls[0]?.[0];
+    const report = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    shell.openExternal.mockRejectedValueOnce(new Error('navegador indisponível'));
+
+    expect(handler?.({ url: 'https://exemplo.com' })).toEqual({ action: 'deny' });
+    await vi.waitFor(() => {
+      expect(report).toHaveBeenCalledWith(
+        'Falha ao abrir URL externa:',
+        expect.objectContaining({ message: 'navegador indisponível' }),
+      );
+    });
+  });
+
   it('permissões da sessão negam tudo (o clipboard vive no main)', () => {
     expect(session.defaultSession.setPermissionRequestHandler).toHaveBeenCalledTimes(1);
     const policy = session.defaultSession.setPermissionRequestHandler.mock.calls[0]?.[0];
@@ -107,6 +122,21 @@ describe('guardas de navegação e sessão', () => {
     const handler = app.on.mock.calls.find(([event]) => event === 'before-quit')?.[1];
     expect(handler).toBeTypeOf('function');
     expect(() => handler?.()).not.toThrow();
+  });
+
+  it('registra falha ao bloquear o cofre durante o encerramento', () => {
+    const handler = app.on.mock.calls.find(([event]) => event === 'before-quit')?.[1];
+    const report = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(vaultSession(), 'wipe').mockImplementation(() => {
+      throw new Error('falha ao zerar chave');
+    });
+
+    handler?.();
+
+    expect(report).toHaveBeenCalledWith(
+      'Falha ao bloquear o cofre no encerramento:',
+      expect.objectContaining({ message: 'falha ao zerar chave' }),
+    );
   });
 
   it('auto-lock empurra vault:auto-locked para o renderer', async () => {
@@ -215,5 +245,31 @@ describe('sessão perdida durante uma operação do cofre', () => {
     expect(isVaultLockedError(new Error(m.errors.entryNotFound))).toBe(false);
     expect(isVaultLockedError('texto solto')).toBe(false);
     expect(isVaultLockedError(null)).toBe(false);
+  });
+
+  it('limpa a referência da janela fechada, recria no activate e encerra ao fechar tudo', async () => {
+    const win = await waitForWindow();
+    const closed = win.on.mock.calls.find(([event]) => event === 'closed')?.[1];
+    const secondInstance = app.on.mock.calls.find(([event]) => event === 'second-instance')?.[1];
+    const activate = app.on.mock.calls.find(([event]) => event === 'activate')?.[1];
+    const allClosed = app.on.mock.calls.find(([event]) => event === 'window-all-closed')?.[1];
+
+    expect(closed).toBeTypeOf('function');
+    expect(activate).toBeTypeOf('function');
+    expect(allClosed).toBeTypeOf('function');
+    closed?.();
+
+    const focus = vi.spyOn(win, 'focus').mockClear();
+    secondInstance?.();
+    expect(focus).not.toHaveBeenCalled();
+
+    const existingWindows = BrowserWindow.instances.length;
+    BrowserWindow.getAllWindows.mockReturnValue([]);
+    activate?.();
+    expect(BrowserWindow.instances).toHaveLength(existingWindows + 1);
+
+    app.quit.mockClear();
+    allClosed?.();
+    expect(app.quit).toHaveBeenCalledOnce();
   });
 });

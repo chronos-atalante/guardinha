@@ -170,4 +170,41 @@ describe('Configurações: autodestruição por tentativas', () => {
 
     expect(setNuke).toHaveBeenCalledWith(0);
   });
+
+  it('edita o limite ativo e confirma o novo valor', async () => {
+    const user = userEvent.setup();
+    installPanic({ hasPanicPin: false, nukeLimit: 60, attemptsMaster: 12 });
+    const api = window.api;
+    const setNuke = vi.fn(() => Promise.resolve({ ok: true, status: UNLOCKED }));
+    api.vault.setNukeLimit = setNuke;
+    api.vault.panicStatus = vi.fn(() =>
+      Promise.resolve({ hasPanicPin: false, nukeLimit: 80, attemptsMaster: 0 }),
+    );
+
+    render(<Settings />);
+    const input = await screen.findByLabelText('Limite de tentativas da senha mestra');
+    await user.clear(input);
+    await user.type(input, '80');
+    await user.click(screen.getByRole('button', { name: 'Ativar autodestruição' }));
+    const confirmation = screen.getByLabelText('Digite o limite para confirmar');
+    await user.clear(confirmation);
+    await user.type(confirmation, '80');
+    await user.click(screen.getByRole('button', { name: 'Ativar autodestruição' }));
+
+    expect(setNuke).toHaveBeenCalledWith(80);
+    expect(await screen.findByText(/80 tentativas/i)).toBeInTheDocument();
+  });
+
+  it('mostra erro interno quando falha ao desativar o limite', async () => {
+    const user = userEvent.setup();
+    installPanic({ hasPanicPin: false, nukeLimit: 60, attemptsMaster: 12 });
+    window.api.vault.setNukeLimit = vi.fn().mockRejectedValue(new Error(''));
+
+    render(<Settings />);
+    await user.click(
+      await screen.findByRole('button', { name: /Desativar autodestruição/i }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/erro/i);
+  });
 });

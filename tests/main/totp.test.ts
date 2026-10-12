@@ -1,5 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
+import crypto from 'node:crypto';
+import { vi } from 'vitest';
 import { hotp, totp, totpRemainingMs, totpStep } from '@zero/main/totp';
 
 /**
@@ -66,6 +68,14 @@ describe('HOTP (RFC 4226)', () => {
   it('o passo do TOTP é o contador do HOTP dividido pelo período', () => {
     // 1111111111 s / 30 = 37037037 passos, exatamente o contador da RFC
     expect(totpStep(1111111111 * 1000, 30)).toBe(37037037);
+  });
+
+  it('falha explicitamente se a implementação HMAC devolver digest truncado', () => {
+    const hmac = crypto.createHmac('sha1', SEED_SHA1);
+    vi.spyOn(hmac, 'digest').mockReturnValue(Buffer.alloc(0));
+    vi.spyOn(crypto, 'createHmac').mockReturnValue(hmac);
+
+    expect(() => hotp(SEED_SHA1, 0, 6, 'SHA1')).toThrow('digest HMAC truncado');
   });
 });
 

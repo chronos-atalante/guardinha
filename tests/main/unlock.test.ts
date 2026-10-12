@@ -121,6 +121,16 @@ describe('runUnlockChain (Chain of Responsibility)', () => {
     expect(loadAuthState().attempts).toBe(1);
   });
 
+  it('derivação que falha é convertida em credencial errada', async () => {
+    resetAttempts();
+    const container = await makeContainer();
+    vi.spyOn(keyUnwrapperFor('pin'), 'derive').mockRejectedValue(new Error('falha no KDF'));
+
+    const result = await runUnlockChain(context(PIN, 'pin', container));
+
+    expect(result).toMatchObject({ ok: false, error: currentMessages().errors.wrongPin });
+  });
+
   it('statusFrom expõe tentativa, espera e travado', () => {
     resetAttempts();
     registerFailedAttempt('pin');

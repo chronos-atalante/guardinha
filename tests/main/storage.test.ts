@@ -1,10 +1,12 @@
 // @vitest-environment node
 import fs from 'node:fs';
+import fsExtra from 'fs-extra';
 import os from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { packEntryPayload, packVaultContainer } from '@zero/main/container';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { packEntryPayload, packVaultContainer, sealManifest } from '@zero/main/container';
 import { currentMessages } from '@zero/main/i18n';
+import { containerFile } from '@zero/main/layout';
 import {
   deleteEntry,
   listEntryIds,
@@ -12,7 +14,12 @@ import {
   writeEntryPayload,
 } from '@zero/main/entries-store';
 import { ensureVaultStructure } from '@zero/main/structure';
-import { readVaultContainer, vaultExists, writeVaultContainer } from '@zero/main/storage';
+import {
+  readVaultContainer,
+  vaultExists,
+  verifyManifest,
+  writeVaultContainer,
+} from '@zero/main/storage';
 import type { VaultContainerData } from '@zero/main/container';
 
 /**
@@ -150,5 +157,40 @@ describe('path traversal bloqueado na camada de storage (CVE-2026-21589)', () =>
     expect(() => deleteEntry('/etc/passwd')).toThrow(currentMessages().errors.invalidId);
     expect(() => deleteEntry('')).toThrow(currentMessages().errors.invalidId);
     expect(() => deleteEntry(String.fromCharCode(0))).toThrow(currentMessages().errors.invalidId);
+  });
+});
+
+describe('erros de payload e manifesto adulterados', () => {
+  it('recusa bytes que não formam um payload de credencial', () => {
+    const id = 'bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    const file = path.join(targetVaultDir(), '.entries', `${id}.zke`);
+    fs.writeFileSync(file, 'payload inválido');
+
+    expect(() => readEntryPayload(id)).toThrow(currentMessages().errors.vaultTampered);
+  });
+
+  it('converte falha de leitura do container em erro de adulteração', () => {
+    const read = vi.spyOn(fsExtra, 'readFileSync').mockImplementationOnce(() => {
+      throw new Error('erro de I/O');
+    });
+    expect(() => readVaultContainer()).toThrow(currentMessages().errors.vaultTampered);
+    read.mockRestore();
+  });
+
+  it('recusa container com formato inválido como adulterado', () => {
+    fs.writeFileSync(containerFile(), 'container inválido');
+    expect(() => readVaultContainer()).toThrow(currentMessages().errors.vaultTampered);
+  });
+
+  it('recusa manifesto cifrado com outra chave', () => {
+    writeVaultContainer(container());
+    const data = readVaultContainer();
+    if (data === null) throw new Error('container de teste não foi gravado');
+    data.manifest = sealManifest(Buffer.alloc(32, 1), [], []);
+    writeVaultContainer(data);
+
+    expect(() => verifyManifest(Buffer.alloc(32, 2))).toThrow(
+      currentMessages().errors.vaultTampered,
+    );
   });
 });

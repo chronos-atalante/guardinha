@@ -68,6 +68,10 @@ describe('evaluateMaster / evaluatePassword', () => {
     expect(evaluatePassword('password').blocked).toBe(false);
     expect(evaluatePassword('password').reasons).toContain('commonWord');
   });
+
+  it('sinaliza uma data de oito dígitos dentro de uma senha', () => {
+    expect(evaluatePassword('Xk9#mQ2$vLp8!Rt4&Wy6^19900101').reasons).toContain('dateLike');
+  });
 });
 
 describe('evaluatePhrase', () => {
