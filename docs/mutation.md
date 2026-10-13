@@ -116,22 +116,52 @@ Duas, e as duas importam:
 --coverage`. Medir contra um `coverage/coverage-final.json` velho é medir
   errado, porque a linha pode ter saído do alcance de qualquer teste. Use
   `--skip-coverage` para reaproveitar o arquivo existente.
+- **O mutante precisa entrar na execução.** Um veredito só significa alguma coisa
+  se o texto mutado tiver rodado. O `fsModuleCache` do Vitest (ligado por
+  padrão) quebrava essa garantia: ele guarda o módulo transformado em
+  `node_modules/.vitest-cache`, indexado pelo id do arquivo, e essa chave não
+  conhece o mutante injetado pelo plugin. O cache do mutante anterior era
+  revalidado como válido, o mutante atual não entrava, a suíte passava rodando
+  contra o texto errado e o veredito saía `survived`. Como só o primeiro mutante
+  de cada arquivo era medido de verdade, o score caía sozinho conforme a
+  varredura avançava: `src/main/unlock.ts` marcava 18% e, com o cache desligado,
+  78%, sem nenhuma alteração no código sob teste. Por isso
+  `fsModuleCache: false` está em `tools/mutation/vitest-options.ts` (e na flag
+  do runner), e `tests/tools/mutation-runner.test.ts` trava a garantia.
+
+## No CI
+
+A varredura completa roda no `quality.yml`, no job **Testes de mutação**, mas
+fora do gate de PR: ela leva cerca de 90 min na máquina de quem escreveu e bem
+mais nos 2 núcleos de um runner. Dispara por `schedule` (domingo de madrugada) e
+por `workflow_dispatch`, com dois inputs:
+
+| Input           | Efeito                                                               |
+| --------------- | -------------------------------------------------------------------- |
+| `min_score`     | reprova a execução se o score ficar abaixo (padrão `0`, não reprova) |
+| `mutation_file` | mede só esses arquivos de `src/`, separados por vírgula              |
+
+O score vai para o resumo da execução e a lista de sobreviventes para o
+artefato `mutacao-relatorio`. Reprovar por score é opt-in porque o número é
+sensive à máquina e ao que está em medição; comparar com a execução anterior é
+mais útil do que um piso fixo.
 
 ## Arquivos
 
-| Arquivo                            | O que é                                                      |
-| ---------------------------------- | ------------------------------------------------------------ |
-| `tools/mutation/run.ts`            | Runner: plano, paralelismo, veredito e relatório.            |
-| `tools/mutation/operators.ts`      | Os doze operadores, em cima da AST do Babel.                 |
-| `tools/mutation/mutants.ts`        | Enumeração estável e aplicação por splicing de texto.        |
-| `tools/mutation/ast.ts`            | Parser e percurso com pai, que é o que separa dado de valor. |
-| `tools/mutation/graph.ts`          | Grafo de módulos sensível a nomes, para escolher testes.     |
-| `tools/mutation/matrix.ts`         | Matriz de linhas por arquivo de teste, com cache.            |
-| `tools/mutation/coverage.ts`       | Leitura do relatório do v8 e filtro de linha alcançada.      |
-| `tools/mutation/plugin.ts`         | Plugin do Vite que injeta o mutante no módulo alvo.          |
-| `tools/mutation/scope.ts`          | O que entra e o que sai, com o motivo de cada exclusão.      |
-| `tools/mutation/hash-wasm-stub.ts` | Doppelgänger barato do Argon2id para a varredura.            |
-| `vitest.mutation.config.mts`       | Config de Vitest da varredura.                               |
+| Arquivo                            | O que é                                                         |
+| ---------------------------------- | --------------------------------------------------------------- |
+| `tools/mutation/run.ts`            | Runner: plano, paralelismo, veredito e relatório.               |
+| `tools/mutation/vitest-options.ts` | Opções de Vitest da varredura, com o `fsModuleCache` desligado. |
+| `tools/mutation/operators.ts`      | Os doze operadores, em cima da AST do Babel.                    |
+| `tools/mutation/mutants.ts`        | Enumeração estável e aplicação por splicing de texto.           |
+| `tools/mutation/ast.ts`            | Parser e percurso com pai, que é o que separa dado de valor.    |
+| `tools/mutation/graph.ts`          | Grafo de módulos sensível a nomes, para escolher testes.        |
+| `tools/mutation/matrix.ts`         | Matriz de linhas por arquivo de teste, com cache.               |
+| `tools/mutation/coverage.ts`       | Leitura do relatório do v8 e filtro de linha alcançada.         |
+| `tools/mutation/plugin.ts`         | Plugin do Vite que injeta o mutante no módulo alvo.             |
+| `tools/mutation/scope.ts`          | O que entra e o que sai, com o motivo de cada exclusão.         |
+| `tools/mutation/hash-wasm-stub.ts` | Doppelgänger barato do Argon2id para a varredura.               |
+| `vitest.mutation.config.mts`       | Config de Vitest da varredura.                                  |
 
 Artefatos em `mutation/` (fora do git): `results.json` com o veredito de cada
 mutante, `matrix.json` com a matriz de linhas, `cov/` com os relatórios

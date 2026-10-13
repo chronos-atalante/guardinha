@@ -285,6 +285,12 @@ async function runMutant(entry: PlannedMutant, options: Options): Promise<RunOut
     '--maxWorkers',
     String(options.maxWorkers),
     '--bail=1',
+    // Redundante com `fsModuleCache: false` em `vitest.mutation.config.mts`, que
+    // é o lugar onde a garantia está de verdade (vale para baseline e matriz
+    // também). Fica aqui para o runner não depender do arquivo de config: se
+    // alguém apontar `MUTATION_CONFIG` para outra config, o cache continua
+    // desligado.
+    '--fsModuleCache=false',
     ...entry.tests,
   ];
 
