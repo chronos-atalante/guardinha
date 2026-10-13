@@ -283,6 +283,36 @@ achados que valem registro:
   conferia que as ids estavam na lista, nunca a ordem.
 - `shred.ts` sobrescrevia com 3 passadas sem teste que conferisse o número.
 
+### A segunda leva: `crypto.ts` e `unlock.ts`
+
+Depois de mover a política de credencial para `@zero/shared`, `src/main/crypto.ts`
+subiu de 83,9% para 91% e `src/main/unlock.ts` de 77,8% para 92,6%. O que a
+varredura pegou:
+
+- **O `fill(0)` da chave derivada não tinha teste nenhum.** Em `crypto.ts` e em
+  `unlock.ts`, um `fill(1)` é mutante que sobrevivia porque a suíte só conferia
+  o resultado da chamada, e o resultado é idêntico com a chave zerada ou com a
+  chave `0x01` no lugar. Agora o Buffer é capturado por referência no
+  `createCipheriv` e conferido depois do retorno.
+- **Os rótulos de domínio do HKDF eram testados, mas não o valor.** O teste
+  antigo fixava que entrada e token de 2FA não dividem chave, e isso continua
+  valendo com um dos rótulos vazio, porque os dois lados ainda divergem. O que
+  se perdia era o contrato com o disco: trocar o rótulo invalida todo `.zke` e
+  todo `.zka` que o usuário já tinha. O teste novo refaz o HKDF à mão, com o
+  rótulo escrito por extenso.
+- **O validador de formato do PIN não provava que a derivação não rodava.** O
+  teste existia, mas media só a resposta, e a resposta é a mesma com o validador
+  removido, só que um Argon2id mais caro. E medir o tempo não fecha o buraco,
+  porque o doppelgänger da varredura deriva em microssegundos. O que separa as
+  duas coisas é a chamada que não aconteceu: agora o teste afirma que `derive`
+  não foi invocado para um PIN malformado.
+
+Ficaram dois sobreviventes em `unlock.ts` que são **equivalentes de verdade**, no
+mesmo sentido dos de `shred.ts`: `if (remaining <= 0)` virando `< 1` não muda nada
+porque `remaining` é inteiro; e o `||` do manipulador de integridade virando `&&`
+não muda nada porque o manipulador de KDF, que vem antes na cadeia, garante que os
+dois operandos existem quando ele roda. São defesas inalcançáveis, não buracos.
+
 O padrão é sempre o mesmo: o teste antigo cobria o caminho feliz e o código tem
 ramas de borda que ninguém exercita. É o que a mutação enxerga e a cobertura de
 linha, sozinha, não.

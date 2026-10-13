@@ -51,6 +51,7 @@ describe('runUnlockChain (Chain of Responsibility)', () => {
   // e `resetAttempts` o preserva, então os testes de corte não podem deixar a
   // autodestruição ligada para os arquivos seguintes
   afterEach(() => {
+    vi.restoreAllMocks();
     writeAuthState({ attempts: 0, lockUntil: null, attemptsMaster: 0, nukeLimit: 0 });
   });
 
@@ -75,6 +76,20 @@ describe('runUnlockChain (Chain of Responsibility)', () => {
     const result = await runUnlockChain(context('123', 'pin', container));
     expect(result).toMatchObject({ ok: false, error: currentMessages().errors.wrongPin });
     expect(loadAuthState().attempts).toBe(1);
+  });
+
+  it('PIN malformado não chega a derivar: o validador de formato corta antes', async () => {
+    // Medir o tempo não basta: com o doppelgänger do Argon2id a derivação é
+    // instantânea, e o PIN errado continuaria sendo recusado no fim da cadeia,
+    // só que caro. O que separa as duas coisas é a chamada que não aconteceu.
+    resetAttempts();
+    const container = await makeContainer();
+    const derive = vi.spyOn(keyUnwrapperFor('pin'), 'derive');
+
+    const result = await runUnlockChain(context('123', 'pin', container));
+
+    expect(result).toMatchObject({ ok: false, error: currentMessages().errors.wrongPin });
+    expect(derive).not.toHaveBeenCalled();
   });
 
   it('senha mestra malformada segue a mesma régua do formato', async () => {
@@ -191,5 +206,56 @@ describe('runUnlockChain (Chain of Responsibility)', () => {
     const result = await unlock({ credential: '00000000', kind: 'pin' });
     expect(result).toMatchObject({ ok: false, error: currentMessages().errors.wrongPin });
     expect(result.status.attempts).toBe(1);
+  });
+
+  /**
+   * Cryptographic Erase da chave de trabalho. O `fill(0)` do manipulador de
+   * integridade é o que impede que a chave derivada do Argon2id fique na pilha
+   * depois do desbloqueio dar certo; o Buffer é capturado por referência, então
+   * continua observável quando a cadeia termina. Um `fill(1)` passaria a suíte
+   * inteira se ela só conferisse o resultado do desbloqueio.
+   */
+  it('apaga a chave derivada depois de usar, no sucesso e na falha', async () => {
+    resetAttempts();
+    const container = await makeContainer();
+    const alvo = keyUnwrapperFor('pin');
+    const original = alvo.derive.bind(alvo);
+    const derivadas: Buffer[] = [];
+    vi.spyOn(alvo, 'derive').mockImplementation(async (method, credential) => {
+      const buffer = await original(method, credential);
+      derivadas.push(buffer);
+      return buffer;
+    });
+
+    await runUnlockChain(context(PIN, 'pin', container));
+    await runUnlockChain(context('00000000', 'pin', container));
+
+    expect(derivadas).toHaveLength(2);
+    for (const buffer of derivadas) expect(buffer.every((byte) => byte === 0)).toBe(true);
+  });
+
+  /**
+   * A resposta de falha carrega o estado do cofre, e a tela decide o que
+   * mostrar a partir dele. Um `true` trocado por `false` aqui mudaria a resposta
+   * que o renderer recebe sem quebrar nenhuma outra asserção.
+   */
+  it('a resposta de falha diz que o cofre existe e continua travado', async () => {
+    resetAttempts();
+    const container = await makeContainer();
+    const result = await runUnlockChain(context('00000000', 'pin', container));
+    expect(result).toMatchObject({ ok: false, status: { exists: true, locked: true } });
+  });
+
+  it('a resposta de trava também diz que o cofre existe e continua travado', async () => {
+    // o manipulador de trava lê o estado do cofre gravado, não o do contexto
+    const ate = Date.now() + 60_000;
+    writeAuthState({ attempts: 3, lockUntil: ate, attemptsMaster: 0, nukeLimit: 0 });
+    const container = await makeContainer();
+
+    const result = await runUnlockChain(context(PIN, 'pin', container));
+
+    expect(result?.ok).toBe(false);
+    expect(result?.status).toMatchObject({ exists: true, locked: true, attempts: 3 });
+    expect(result?.status.lockRemainingMs).toBeGreaterThan(0);
   });
 });

@@ -1,5 +1,6 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import crypto from 'node:crypto';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   KDF_CREDENTIAL,
   KDF_PIN,
@@ -181,5 +182,90 @@ describe('derivação por HKDF', () => {
     for (const profile of params) {
       expect(await deriveKey('senha-de-teste', salt, profile)).toHaveLength(32);
     }
+  });
+});
+
+/**
+ * Cryptographic Erase da chave em RAM. O `fill(0)` é o que impede que a chave
+ * derivada do registro sobreviva à chamada que a usou: o Buffer é capturado por
+ * referência no `createCipheriv`, então ele continua observável depois do
+ * retorno. Um `fill(1)` aqui é um mutante que a suíte precisa matar, porque a
+ * variante silenciosa é a chave inteira em memória até o GC.
+ */
+describe('apaga a chave derivada depois de usar', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('na cifragem: a chave entregue ao AES não sobrevive em memória', () => {
+    const spy = vi.spyOn(crypto, 'createCipheriv');
+    encryptRecord({ title: 'GitHub' }, randomBytes(32));
+
+    const usada = spy.mock.calls[0]?.[1];
+    expect(usada).toBeInstanceOf(Buffer);
+    expect((usada as Buffer).every((byte) => byte === 0)).toBe(true);
+  });
+
+  it('na decifragem: idem, e no domínio de token também', () => {
+    const key = randomBytes(32);
+    const payload = encryptAuthRecord({ issuer: 'GitHub' }, key);
+    const spy = vi.spyOn(crypto, 'createDecipheriv');
+    decryptAuthRecord(payload, key);
+
+    const usada = spy.mock.calls[0]?.[1];
+    expect(usada).toBeInstanceOf(Buffer);
+    expect((usada as Buffer).every((byte) => byte === 0)).toBe(true);
+  });
+});
+
+/**
+ * Os rótulos de domínio são contrato com os arquivos já gravados: mudá-los
+ * invalida todo `.zke` e todo `.zka` que o usuário já tinha. A suíte fixava a
+ * separação entre os domínios (que sobrevive a rótulo vazio em um dos lados),
+ * mas não o valor. Aqui o HKDF é refeito à mão, com o rótulo escrito por extenso.
+ */
+describe('rótulos de domínio do HKDF', () => {
+  const esperado = (key: Buffer, salt: Buffer, info: string): Buffer =>
+    Buffer.from(crypto.hkdfSync('sha512', key, salt, info, 32));
+
+  /** Devolve a chave como ela era quando o AES a recebeu, antes do `fill(0)`. */
+  const comChaveCapturada = (salt: Buffer, run: () => unknown): Buffer => {
+    const original = crypto.createCipheriv;
+    const capturadas: Buffer[] = [];
+    vi.spyOn(crypto, 'randomBytes').mockImplementation(() => salt);
+    vi.spyOn(crypto, 'createCipheriv').mockImplementation((alg, chave, iv) => {
+      capturadas.push(Buffer.from(chave as Buffer));
+      return original(alg, chave, iv);
+    });
+    try {
+      run();
+    } finally {
+      vi.restoreAllMocks();
+    }
+    const [primeira] = capturadas;
+    if (primeira === undefined) throw new Error('createCipheriv não recebeu chave');
+    return primeira;
+  };
+
+  it('a chave de registro usa exatamente o rótulo de entrada documentado', () => {
+    const key = randomBytes(32);
+    const salt = randomBytes(16);
+    // cópia no momento da chamada: depois de `encryptRecord` o Buffer original
+    // já foi zerado, e é justamente esse oOutro teste
+    const usada = comChaveCapturada(salt, () => encryptRecord({ title: 'GitHub' }, key));
+    expect(usada).toEqual(esperado(key, salt, 'guardinha-vault-entry-v1'));
+  });
+
+  it('a chave de token usa exatamente o rótulo de 2FA documentado', () => {
+    const key = randomBytes(32);
+    const salt = randomBytes(16);
+    const usada = comChaveCapturada(salt, () => encryptAuthRecord({ issuer: 'GitHub' }, key));
+    expect(usada).toEqual(esperado(key, salt, 'guardinha-vault-auth-v1'));
+  });
+
+  it('deriveAuthKey bate com o rótulo de 2FA, e é isso que o grava', () => {
+    const key = randomBytes(32);
+    const salt = randomBytes(16);
+    expect(deriveAuthKey(key, salt)).toEqual(esperado(key, salt, 'guardinha-vault-auth-v1'));
   });
 });
