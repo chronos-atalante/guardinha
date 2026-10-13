@@ -187,16 +187,25 @@ individuais e `report.md` com o resumo e a lista de sobreviventes.
 ## Números da varredura
 
 Medidos em `src/` inteiro depois da correção do `fsModuleCache` (ver a garantia
-em "O mutante precisa entrar na execução"): **67,8%**, com 2.530 mutantes em 796
-testes. No denominador ficaram 2.295: 1.557 mortos e 738 sobreviventes. Ficaram
-fora 141 `timeout` e 94 `compileError`, que não são veredito da suíte.
+em "O mutante precisa entrar na execução"): 2.530 mutantes em 820 testes. No
+denominador ficaram 2.293: 1.583 mortos e 710 sobreviventes. Ficaram fora 143
+`timeout` e 94 `compileError`, que não são veredito da suíte.
 
 | Área                    | Score | Mortos | Sobreviv. | Observação                                    |
 | ----------------------- | ----- | ------ | --------- | --------------------------------------------- |
 | `src/messages/index.ts` | 100%  | 1      | 0         | o registro de idiomas                         |
-| `src/main/*`            | 87,2% | 916    | 134       | o núcleo de segurança                         |
-| `src/shared/*`          | 69,0% | 216    | 97        | `otpauth` 86%, `strength` 56%                 |
-| `src/renderer/*`        | 45,5% | 424    | 507       | a tela é verificada por fluxo, não por estado |
+| `src/main/*`            | 89,6% | 941    | 109       | o núcleo de segurança                         |
+| `src/shared/*`          | 69,8% | 217    | 94        | `otpauth` 86%, `strength` 56%                 |
+| `src/renderer/*`        | 45,6% | 425    | 507       | a tela é verificada por fluxo, não por estado |
+
+**69,0%** no geral depois da primeira leva de testes novos (era 67,8% na leitura
+bruta). O que rendeu: `src/main/shred.ts` foi de 43% para 95%, e `clipboard.ts`,
+`activity.ts` e `format.ts` chegaram a 100%. O padrão que matou mais foi contar
+coisas em vez de só conferir o resultado: o número de passadas da sobrescrita, o
+tamanho e a posição de cada escrita, e se `clearTimeout` foi chamado com um
+temporizador de verdade. O que sobrou em `shred.ts` são mutantes equivalentes de
+verdade: o `&&` do laço de diretório não muda o resultado porque o `rmdir` falha
+de qualquer jeito quando sobrou arquivo.
 
 O quadro é desigual de propósito, e vale ler assim: o `src/main/*` é a parte em
 que a mutação carrega argumento, e o `src/renderer/*` é a parte em que ela

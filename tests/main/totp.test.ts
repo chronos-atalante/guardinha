@@ -139,4 +139,12 @@ describe('passo de tempo do TOTP', () => {
     expect(totpRemainingMs(-5_000, 30)).toBeGreaterThanOrEqual(0);
     expect(totpRemainingMs(-5_000, 0)).toBeGreaterThanOrEqual(0);
   });
+
+  it('o período de 1 s tem um segundo de janela, não dois', () => {
+    // O piso de `Math.max(1, Math.floor(period))` é o que segura período zero,
+    // fracionário e menor que um. Com o piso em 2, o período de 1 s passaria a
+    // valer 2 s e a barra de contagem regressiva mentiria.
+    expect(totpRemainingMs(0, 1)).toBe(1_000);
+    expect(totpRemainingMs(1_000, 1)).toBe(1_000);
+  });
 });
