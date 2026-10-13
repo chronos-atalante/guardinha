@@ -176,34 +176,49 @@ individuais e `report.md` com o resumo e a lista de sobreviventes.
 - O operador `optional-chaining` gera mutante que estoura em `TypeError` quando
   o valor realmente é nulo. A suíte mata, e a mutação está certa, mas é um sinal
   mais fraco que os outros.
-- O grafo de módulos é estático: `import()` dinâmico com variável não é
-  seguido. Hoje `src/` não tem nenhum caso assim.
+- O grafo de módulos é estático e **não segue `import()` dinâmico**, nem com
+  especificador literal. `tests/main/preload.test.ts` carrega o preload com
+  `await import('@zero/preload/index')` para poder rodar `vi.resetModules()`, e
+  isso tira `src/preload/index.ts` do grafo inteiro: ele não aparece no plano e
+  **não é medido**. É a ponte entre a interface e o main, então a lacuna não é
+  pequena. Hoje é o único caso assim, mas o grafo deveria aceitar `import()` de
+  especificador literal antes que isso mude.
 
-## Números da primeira varredura
+## Números da varredura
 
-Medidos em `src/` inteiro: 2.560 mutantes em 50 arquivos, com a suíte de 782
-testes. O quadro é desigual de propósito, e vale ler assim:
+Medidos em `src/` inteiro depois da correção do `fsModuleCache` (ver a garantia
+em "O mutante precisa entrar na execução"): **67,8%**, com 2.530 mutantes em 796
+testes. No denominador ficaram 2.295: 1.557 mortos e 738 sobreviventes. Ficaram
+fora 141 `timeout` e 94 `compileError`, que não são veredito da suíte.
 
-| Área                   | Score | Observação                                       |
-| ---------------------- | ----- | ------------------------------------------------ |
-| `src/main/*`           | 84%   | o núcleo de segurança; o resto são lacunas reais |
-| `src/preload/index.ts` | 96%   | praticamente coberto                             |
-| `src/shared/otpauth`   | 86%   | o parse de `otpauth://`                          |
-| `src/shared/strength`  | 47%   | muito sobrevivente é constante de tabela         |
-| `src/renderer/*`       | 45%   | a tela é verificada por fluxo, não por estado    |
+| Área                    | Score | Mortos | Sobreviv. | Observação                                    |
+| ----------------------- | ----- | ------ | --------- | --------------------------------------------- |
+| `src/messages/index.ts` | 100%  | 1      | 0         | o registro de idiomas                         |
+| `src/main/*`            | 87,2% | 916    | 134       | o núcleo de segurança                         |
+| `src/shared/*`          | 69,0% | 216    | 97        | `otpauth` 86%, `strength` 56%                 |
+| `src/renderer/*`        | 45,5% | 424    | 507       | a tela é verificada por fluxo, não por estado |
 
-Os piores operadores foram `string-empty` (43%) e `numeric` (56%). Os dois têm a
-mesma origem: o primeiro mede se a suíte fixa cada constante do código, e o
-segundo o mesmo. São buracos de verdade, mas de baixo risco se o valor só muda
-de 3 para 4; a exceção é quando a constante é de segurança, e aí o teste tem que
-fixar o número (foi o que passou nos perfis de Argon2id, no período ocioso e no
-número de passadas do shred).
+O quadro é desigual de propósito, e vale ler assim: o `src/main/*` é a parte em
+que a mutação carrega argumento, e o `src/renderer/*` é a parte em que ela
+confirma o que já se sabia, que tela se prova por fluxo e não por estado. O
+`src/shared/strength.ts` fica no meio porque muito sobrevivente dele é constante
+de tabela: a suíte fixa o comportamento e não cada palavra da tabela.
 
-`src/shared/strength.ts` e `src/renderer/*` puxam a média para baixo por um
-motivo específico: os arquivos de teste lentos do renderer (`AuthModal`,
-`Authenticator`) entram na seleção de quase todo mutante de `src/shared`, e cada
-execução que não morre no primeiro teste paga a seleção inteira. Parte dos
-mutantes marcados como `timeout` são esses casos, não buracos.
+Por operador, os melhores são `ternary-swap` (100%, mas com um único mutante),
+`negation` (95%), `equality` (94%) e `if-remove` (89%): os quatro medem decisão,
+que é o que a suíte costuma fixar. Os piores são `string-empty` (44%), que mede
+se a suíte trava cada constante do código, `boundary` (59%), `numeric` (64%) e
+`optional-chaining` (53%). Os três primeiros têm a mesma origem, que é a mesma do
+primeiro: buracos de verdade, mas de baixo risco quando o valor só muda de 3
+para 4; a exceção é quando a constante é de segurança, e aí o teste tem que fixar
+o número (foi o que passou nos perfis de Argon2id, no período ocioso e no número
+de passadas do shred).
+
+**Ler esse número antes do anterior importa:** a varredura anterior media o
+mutante errado a partir do segundo mutante de cada arquivo, então os placares
+antigos estavam subindo sozinhos conforme a varredura avançava. Os números de
+`src/main/unlock.ts` exemplifiesem: 18% na leitura errada, 78% agora, sem nenhuma
+mudança no código sob teste.
 
 ## O que a varredura encontrou
 
