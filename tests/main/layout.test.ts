@@ -1,8 +1,8 @@
 // @vitest-environment node
 import fs from 'fs-extra';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { vaultDir, entriesDir } from '@zero/main/layout';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { authDir, entriesDir, vaultDir } from '@zero/main/layout';
 import {
   ensureVaultStructure,
   isPermissionError,
@@ -91,6 +91,15 @@ describe('structure:erro de permissão', () => {
     expect(isVaultDirUnavailable(new Error('outro erro'))).toBe(false);
     expect(isVaultDirUnavailable('texto')).toBe(false);
   });
+
+  it('propaga erro de estrutura que não seja de permissão sem traduzi-lo', () => {
+    const error = new Error('disco indisponível');
+    vi.spyOn(fs, 'ensureDirSync').mockImplementationOnce(() => {
+      throw error;
+    });
+
+    expect(() => ensureVaultStructure()).toThrow(error);
+  });
 });
 
 describe('structure:varredura de arquivos', () => {
@@ -123,5 +132,25 @@ describe('structure:varredura de arquivos', () => {
     process.env.GUARDINHA_VAULT_DIR = fs.mkdtempSync(path.join(process.env.HOME ?? '/tmp', 'gv-'));
     fs.ensureDirSync(path.join(vaultDir(), '.entries', 'sub'));
     expect(vaultFiles()).toEqual([]);
+  });
+});
+
+describe('modo das pastas do cofre', () => {
+  it('cria e reaplica 0700 em vaultDir, entriesDir e authDir', () => {
+    // `ensureVaultStructure` também chama `chmodSync`, para corrigar uma pasta
+    // que já existia com modo frouxo. Sem conferir o modo, a pasta passaria a
+    // listar os `.zke` de qualquer usuário da máquina.
+    ensureVaultStructure();
+
+    for (const dir of [vaultDir(), entriesDir(), authDir()]) {
+      expect(fs.statSync(dir).mode & 0o777).toBe(0o700);
+    }
+  });
+
+  it('reaplica 0700 mesmo quando a pasta já existia frouxa', () => {
+    ensureVaultStructure();
+    fs.chmodSync(entriesDir(), 0o755);
+    ensureVaultStructure();
+    expect(fs.statSync(entriesDir()).mode & 0o777).toBe(0o700);
   });
 });

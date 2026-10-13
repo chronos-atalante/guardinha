@@ -1,6 +1,5 @@
 import crypto from 'node:crypto';
 import { argon2id } from 'hash-wasm';
-import type { GeneratorOptions } from '@zero/types';
 
 /** Parâmetros do Argon2id usados na derivação da chave do cofre. */
 export interface Argon2Params {
@@ -180,57 +179,4 @@ export function normalizeRecoveryPhrase(phrase: string): string {
     .split(/\s+/)
     .filter((word) => word !== '')
     .join(' ');
-}
-
-/**
- * Conjuntos de caracteres por categoria. Ficam aqui, e não inline na função,
- * para que o teste do gerador possa conferir o mesmo conjunto que ele usa.
- */
-const CHARS_LOWER = 'abcdefghijklmnopqrstuvwxyz';
-const CHARS_UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const CHARS_NUMBERS = '0123456789';
-const CHARS_SYMBOLS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-
-/**
- * Conjunto de caracteres da senha: só as categorias marcadas na tela. Só
- * "Maiúsculas" sai só maiúsculas, só "Números" sai só números, e assim por
- * diante. Sem nenhuma categoria marcada não há o que sortear, então devolve
- * vazio (a tela não deixa chegar aqui: a última categoria ligada não desliga).
- */
-export function passwordCharSet(options: GeneratorOptions): string {
-  let charSet = '';
-  if (options.useLower) charSet += CHARS_LOWER;
-  if (options.useUpper) charSet += CHARS_UPPER;
-  if (options.useNumbers) charSet += CHARS_NUMBERS;
-  if (options.useSymbols) charSet += CHARS_SYMBOLS;
-  return charSet;
-}
-
-/**
- * Gerador com injeção de palavras de entropia personalizada. O segredo sai do
- * `crypto` do Node (hardware), nunca do `Math.random` do renderer.
- */
-export function generateHighEntropyPassword(options: GeneratorOptions): string {
-  const { length } = options;
-  if (length <= 0) return '';
-  const charSet = passwordCharSet(options);
-  if (charSet === '') return '';
-
-  // Mistura palavras pessoais com entropia criptográfica de sistema
-  const combinedEntropy = options.customEntropyWords.join('');
-  const personalDigest = crypto
-    .createHash('sha512')
-    .update(combinedEntropy + crypto.randomBytes(32).toString('hex'))
-    .digest();
-
-  let password = '';
-  for (let i = 0; i < length; i++) {
-    // Digest pessoal (entropia dos gostos) desloca o índice; o randomInt de
-    // hardware mantém a seleção uniforme sobre o conjunto de caracteres.
-    const personalByte = personalDigest[i % personalDigest.length] ?? 0;
-    const roll = (personalByte + crypto.randomInt(charSet.length)) % charSet.length;
-    password += charSet[roll] ?? '';
-  }
-
-  return password;
 }

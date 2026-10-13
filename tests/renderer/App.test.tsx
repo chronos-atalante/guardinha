@@ -1,8 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import App from '@zero/renderer/App';
-import { LOCKED, UNLOCKED, installApi } from '../mocks/api.ts';
+import { autoLockedListeners, LOCKED, UNLOCKED, installApi } from '../mocks/api.ts';
 import type { Credential } from '@zero/types';
 
 const ENTRY: Credential = {
@@ -38,7 +38,38 @@ describe('App', () => {
 
     render(<App />);
 
+    // `Home` começa em "abrindo o cofre" e só mostra o heading depois da
+    // lista; sob a suíte inteira rodando em paralelo esse IPC passa do segundo
+    // padrão do Testing Library. O limite alto só custa tempo no caminho da
+    // falha: enquanto o heading não aparece, a espera continua.
+    await screen.findByRole('heading', { name: 'Senhas' }, { timeout: 15_000 });
     expect(await screen.findByText('GitHub')).toBeInTheDocument();
+  });
+
+  it('exibe o aviso da tela quando uma credencial é copiada', async () => {
+    const user = userEvent.setup();
+    installApi({ status: UNLOCKED, entries: [ENTRY] });
+    render(<App />);
+    await screen.findByText('GitHub');
+
+    await user.click(screen.getByTitle('Copiar usuário'));
+
+    expect(await screen.findByText('Copiado para a área de transferência.')).toBeInTheDocument();
+  });
+
+  it('atualiza o status após o evento de auto-lock enviado pelo main', async () => {
+    const api = installApi({ status: UNLOCKED, entries: [ENTRY] });
+    const status = vi.fn().mockResolvedValueOnce(UNLOCKED).mockResolvedValue(LOCKED);
+    api.vault.status = status;
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Senhas' });
+
+    const listener = autoLockedListeners[0];
+    if (listener === undefined) throw new Error('listener de auto-lock não registrado');
+    act(() => listener(LOCKED));
+
+    expect(await screen.findByRole('button', { name: /Desbloquear/i })).toBeInTheDocument();
+    expect(status).toHaveBeenCalledTimes(2);
   });
 
   it('leva à criação do cofre quando ele não existe', async () => {

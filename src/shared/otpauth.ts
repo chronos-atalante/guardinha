@@ -22,6 +22,8 @@ export const OTP_ALGORITHMS: readonly OtpAlgorithm[] = ['SHA1', 'SHA256', 'SHA51
 export const OTP_DEFAULT_ALGORITHM: OtpAlgorithm = 'SHA1';
 export const OTP_DEFAULT_DIGITS = 6;
 export const OTP_DEFAULT_PERIOD = 30;
+/** HOTP/TOTP shared secrets must contain at least 128 bits (RFC 4226). */
+export const OTP_SECRET_MIN_BYTES = 16;
 
 /** O draft do IETF só admite 6 ou 8; nada de serviço real usa fora disso. */
 export const OTP_DIGIT_CHOICES: readonly number[] = [6, 8];
@@ -92,7 +94,9 @@ export function parseOtpAuthUri(uri: string): OtpUri | null {
   const secretParam = params.get('secret');
   if (secretParam === null || !isBase32(secretParam)) return null;
   const secret = normalizeBase32(secretParam);
-  if (base32Decode(secret)?.length === 0) return null;
+  const secretBytes = base32Decode(secret);
+  if (secretBytes === null || secretBytes.length < OTP_SECRET_MIN_BYTES) return null;
+  secretBytes.fill(0);
 
   // Rótulo `Emissor:conta` ou só `conta`. O separador pode chegar cru (`:`) ou
   // escapado (`%3A`), que é o que a wiki do Google aceita; o corte é feito no

@@ -4,6 +4,24 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import prettier from 'eslint-config-prettier';
 
+/** Módulos do `main` autorizados a tocar `fs` (regra do AGENTS.md). */
+const FS_OWNERS = [
+  'storage',
+  'entries-store',
+  'auth-store',
+  'structure',
+  'settings',
+  'shred',
+  'erase',
+  'protocol',
+];
+
+const FS_MESSAGE =
+  'I/O de disco só nos módulos de persistência do AGENTS.md. Aqui, passe pela VaultStorageFacade.';
+
+const RENDERER_MESSAGE =
+  'O renderer e o preload não tocam disco nem Node: o renderer só conhece window.api.';
+
 export default tseslint.config(
   {
     ignores: ['out/**', 'release/**', 'node_modules/**', 'build/**', 'coverage/**'],
@@ -139,6 +157,64 @@ export default tseslint.config(
       globals: {
         ...globals.node,
       },
+    },
+  },
+  {
+    // A regra do `fs` do AGENTS.md é de fronteira: só alguns módulos do main
+    // tocam disco, porque o resto passa pela fachada. Sem isto aqui, um `fs`
+    // novo num módulo de domínio passava pelo `check` sem ninguém perceber.
+    files: ['src/main/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'fs', message: FS_MESSAGE },
+            { name: 'node:fs', message: FS_MESSAGE },
+            { name: 'fs/promises', message: FS_MESSAGE },
+            { name: 'fs-extra', message: FS_MESSAGE },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [`src/main/{${FS_OWNERS.join(',')}}.ts`],
+    rules: { 'no-restricted-imports': 'off' },
+  },
+  {
+    // O renderer não toca disco nem Node, e o preload é sandboxed: qualquer
+    // import de sistema aqui é defeito, não escolha de arquitetura.
+    files: ['src/renderer/**/*.{ts,tsx}', 'src/preload/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'fs', message: RENDERER_MESSAGE },
+            { name: 'node:fs', message: RENDERER_MESSAGE },
+            { name: 'fs/promises', message: RENDERER_MESSAGE },
+            { name: 'fs-extra', message: RENDERER_MESSAGE },
+            { name: 'node:child_process', message: RENDERER_MESSAGE },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Em `src/` vale `no-throw-literal` sem exceção: lá, um literal lançado é
+    // sempre descuido. Nos testes a exceção é outra: boa parte das defesas do
+    // main só existe porque o valor lançado **não** é um `Error`, e o jeito
+    // honesto de expressar "isto é desconhecido em tempo de compilação" é o
+    // tipo `unknown`. Trocamos pela variante tipada, que é a que aceita as
+    // opções; literal continua barrado, inclusive nos testes.
+    files: ['tests/**/*.{ts,tsx}'],
+    rules: {
+      'no-throw-literal': 'off',
+      '@typescript-eslint/only-throw-error': [
+        'error',
+        { allowThrowingAny: false, allowThrowingUnknown: true },
+      ],
     },
   },
   {

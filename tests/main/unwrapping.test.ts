@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { KDF_CREDENTIAL, KDF_PIN, decryptRecord } from '@zero/main/crypto';
+import { KDF_CREDENTIAL, KDF_PIN, decryptRecord, encryptRecord } from '@zero/main/crypto';
 import { isKdfUpToDate, keyUnwrapperFor } from '@zero/main/unwrapping';
 import type { CredentialKind } from '@zero/main/unwrapping';
 import type { WrappedMethod } from '@zero/main/container';
@@ -28,6 +28,10 @@ describe('KeyUnwrapperFactory (Factory Method)', () => {
     expect(keyUnwrapperFor('master').kind).toBe('master');
     expect(keyUnwrapperFor('pin').kind).toBe('pin');
     expect(keyUnwrapperFor('recovery').kind).toBe('recovery');
+    expect(keyUnwrapperFor('panic').kind).toBe('panic');
+    expect(() => keyUnwrapperFor('unknown' as CredentialKind)).toThrow(
+      'método de desbloqueio desconhecido: unknown',
+    );
   });
 
   it('cada tipo recebe o custo do Argon2id adequado ao segredo', () => {
@@ -35,6 +39,7 @@ describe('KeyUnwrapperFactory (Factory Method)', () => {
     expect(keyUnwrapperFor('pin').kdf).toMatchObject(KDF_PIN);
     expect(keyUnwrapperFor('master').kdf).toMatchObject(KDF_CREDENTIAL);
     expect(keyUnwrapperFor('recovery').kdf).toMatchObject(KDF_CREDENTIAL);
+    expect(keyUnwrapperFor('panic').kdf).toMatchObject(KDF_PIN);
   });
 
   it('isUpToDate compara o custo gravado com o perfil atual', async () => {
@@ -49,7 +54,7 @@ describe('KeyUnwrapperFactory (Factory Method)', () => {
     expect(isKdfUpToDate(kind, older)).toBe(false);
   });
 
-  for (const kind of ['master', 'pin', 'recovery'] as const) {
+  for (const kind of ['master', 'pin', 'recovery', 'panic'] as const) {
     it(`${kind}: embrulha e desembrulha a mesma chave de 32 bytes`, async () => {
       const unwrapper = keyUnwrapperFor(kind);
       const method = await unwrapper.wrap(VAULT_KEY, CREDENTIALS[kind]);
@@ -73,11 +78,35 @@ describe('KeyUnwrapperFactory (Factory Method)', () => {
     });
   }
 
+  it('recusa chave desembrulhada com tamanho diferente de 32 bytes', () => {
+    const derived = Buffer.alloc(32, 7);
+    const method: WrappedMethod = {
+      kdf: keyUnwrapperFor('master').kdf,
+      kdfSalt: '00'.repeat(16),
+      payload: encryptRecord({ key: 'curta' }, derived),
+    };
+
+    expect(() => keyUnwrapperFor('master').unwrap(method, derived)).toThrow('container corrompido');
+  });
+
   it('o payload do embrulho só abre com a chave de trabalho certa', async () => {
     const method = await keyUnwrapperFor('pin').wrap(VAULT_KEY, PIN);
     const derived = await keyUnwrapperFor('pin').derive(method, PIN);
     // o payload guarda a chave em hex cifrado; sem o derived certo ele não abre
     expect(() => decryptRecord(method.payload, Buffer.alloc(32, 1))).toThrow();
     derived.fill(0);
+  });
+});
+
+describe('perfis de KDF por método de desbloqueio', () => {
+  it('usa o perfil da senha mestra para master e recovery, e o do PIN para pin e panic', () => {
+    // O roteamento é o que dá ao PIN de pânico o mesmo custo do PIN legítimo.
+    // Inverter a escolha faria o atalho do coator ficar mais barato (ou mais
+    // caro) que o caminho honesto, que é justamente o que não pode acontecer.
+    expect(keyUnwrapperFor('master').kdf).toMatchObject(KDF_CREDENTIAL);
+    expect(keyUnwrapperFor('recovery').kdf).toMatchObject(KDF_CREDENTIAL);
+    expect(keyUnwrapperFor('pin').kdf).toMatchObject(KDF_PIN);
+    expect(keyUnwrapperFor('panic').kdf).toMatchObject(KDF_PIN);
+    expect(keyUnwrapperFor('master').kdf.algo).toBe('argon2id');
   });
 });

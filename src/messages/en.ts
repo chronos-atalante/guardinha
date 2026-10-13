@@ -317,7 +317,8 @@ export const en: Messages = {
     invalidAuthTokenUri:
       'Invalid `otpauth://` address. Check that you pasted the whole address, ' +
       'starting with `otpauth://totp/`, and that the issuer matches the label.',
-    invalidAuthSecret: 'The setup key must be valid Base32 (A-Z and 2-7).',
+    invalidAuthSecret:
+      'The setup key must be valid Base32 (A-Z and 2-7) and contain at least 128 bits (16 bytes).',
     authTokenNotFound: '2FA token not found.',
     internal: 'Internal vault error.',
   },

@@ -13,7 +13,6 @@ import { vaultSession } from '@zero/main/session';
 import { setupVaultDirectory } from '@zero/main/privilege';
 import { secureClipboard } from '@zero/main/clipboard';
 import { clearDestroyedFlag } from '@zero/main/erasure-state';
-import { eraseVault } from '@zero/main/erase';
 import { decoyKey, isKdfUpToDate, keyUnwrapperFor } from '@zero/main/unwrapping';
 import { runUnlockChain } from '@zero/main/unlock';
 import type { UnlockContext } from '@zero/main/unlock';
@@ -62,10 +61,10 @@ export function lock(): VaultStatus {
  *
  * Usado pelo botão de pânico e pelo PIN de coação.
  */
-export function panicDestroy(): VaultStatus {
+export async function panicDestroy(): Promise<VaultStatus> {
   vaultSession().wipe();
-  eraseVault();
-  secureClipboard.dispose();
+  vaultStorage.erase();
+  await secureClipboard.dispose();
   return getStatus();
 }
 
@@ -251,8 +250,8 @@ export async function unlock(input: UnlockInput): Promise<VaultResult> {
   // antes de tudo, e sem respectar a trava: o PIN de pânico destrói o cofre
   if (await tryPanicUnlock(input, container)) {
     vaultSession().wipe();
-    eraseVault();
-    secureClipboard.dispose();
+    vaultStorage.erase();
+    await secureClipboard.dispose();
     // A pessoa sob coação precisa de um cofre aberto e vazio para mostrar, não
     // de um erro que denuncie o mecanismo. A sessão decoy não guarda chave
     // alguma (a real já saiu da RAM), então nada aqui decifra um `.zke`.
@@ -265,7 +264,7 @@ export async function unlock(input: UnlockInput): Promise<VaultResult> {
   if (rejected !== null) return rejected;
   // a senha mestra cruzou o limite estrito: autodestruição, sem abrir nada
   if (context.nuked === true) {
-    panicDestroy();
+    await panicDestroy();
     return { ok: false, error: m.errors.vaultDestroyed, status: getStatus() };
   }
   const vaultKey = context.vaultKey;
@@ -395,21 +394,25 @@ export async function resetPin(input: ResetPinInput): Promise<VaultResult> {
     const phrase = normalizeRecoveryPhrase(input.phrase);
     if (phrase.split(' ').length < RECOVERY_MIN_WORDS) throw new Error('frase curta');
     const derived = await recovery.derive(method, phrase);
-    const vaultKey = recovery.unwrap(method, derived);
-    derived.fill(0);
+    // a chave de trabalho sai da RAM mesmo se o desembrulho falhar, então o
+    // zero fica no `finally` e não no corpo feliz
+    try {
+      const vaultKey = recovery.unwrap(method, derived);
+      container.methods.pin = await keyUnwrapperFor('pin').wrap(vaultKey, input.newPin);
+      // a frase está na mão: aproveita para subir o custo do método de recuperação
+      if (!isKdfUpToDate('recovery', method)) {
+        container.methods.recovery = await recovery.wrap(vaultKey, phrase);
+      }
+      vaultStorage.writeContainer(container);
 
-    container.methods.pin = await keyUnwrapperFor('pin').wrap(vaultKey, input.newPin);
-    // a frase está na mão: aproveita para subir o custo do método de recuperação
-    if (!isKdfUpToDate('recovery', method)) {
-      container.methods.recovery = await recovery.wrap(vaultKey, phrase);
+      // a chave nova assume a sessão (zerando a anterior) no Singleton
+      vaultSession().adopt(vaultKey);
+      vaultStorage.initManifest(vaultKey);
+      resetAttempts();
+      return { ok: true, status: getStatus() };
+    } finally {
+      derived.fill(0);
     }
-    vaultStorage.writeContainer(container);
-
-    // a chave nova assume a sessão (zerando a anterior) no Singleton
-    vaultSession().adopt(vaultKey);
-    vaultStorage.initManifest(vaultKey);
-    resetAttempts();
-    return { ok: true, status: getStatus() };
   } catch {
     // a frase de recuperação não soma em `attemptsMaster`: o limite estrito é
     // só da senha mestra, senão o caminho de recuperação seria um atalho para

@@ -39,8 +39,9 @@ permissões certas. A senha nunca passa pelo app.
 - **Acesso com PIN.** Login só com PIN de 8 dígitos. A senha mestra só é
   oferecida depois de 3 falhas, e a frase de recuperação **não é forma de
   login**: existe para redefinir o PIN esquecido.
-- **Medidor de força.** Nota, segmentos e motivos ao vivo em toda senha criada
-  ou colada; o app recusa credencial previsível na hora de salvar.
+- **Medidor de força.** Nota, segmentos e motivos ao vivo nas credenciais do
+  cofre, no gerador e nos dados de criação e recuperação; credenciais
+  previsíveis são recusadas ao criar o cofre ou redefinir o PIN.
 - **Verificador 2FA.** Tokens TOTP (RFC 6238) calculados no próprio aparelho,
   com contagem regressiva e expiração visível.
 - **Gerador de senhas.** Tamanho ajustável, conjunto de caracteres escolhido
@@ -60,8 +61,8 @@ permissões certas. A senha nunca passa pelo app.
 
 |                    |                                                                      |
 | ------------------ | -------------------------------------------------------------------- |
-| Derivação da chave | Argon2id, custo por credencial (o PIN é o mais caro)                 |
-| Cifragem           | AES-256-GCM por arquivo, com salt e IV de 128 bits por hardware      |
+| Derivação da chave | Argon2id, custo por método de desbloqueio (o PIN é o mais caro)      |
+| Cifragem           | AES-256-GCM por arquivo, com salt e IV aleatórios de 128 bits        |
 | Chave do cofre     | Vive só na memória do processo principal e nunca sai por IPC         |
 | Contra força bruta | Trava exponencial persistida em disco e auto-lock por ociosidade     |
 | Interface          | `contextIsolation`, `sandbox`, CSP e navegação presa à página do app |
@@ -79,12 +80,12 @@ contratos ficam em `src/types/` e todos os textos em `src/messages/`.
 
 ## Desenvolvimento
 
-| Comando         | O que faz                                     |
-| --------------- | --------------------------------------------- |
-| `npm run dev`   | Sobe o app em desenvolvimento                 |
-| `npm run check` | typecheck + lint + formatação + auditoria OSV |
-| `npm test`      | Suíte Vitest                                  |
-| `npm run dist`  | Gera o `.deb` com electron-builder            |
+| Comando         | O que faz                                                  |
+| --------------- | ---------------------------------------------------------- |
+| `npm run dev`   | Sobe o app em desenvolvimento                              |
+| `npm run check` | typecheck + lint + formatação + auditoria OSV + shellcheck |
+| `npm test`      | Suíte Vitest                                               |
+| `npm run dist`  | Gera o `.deb` com electron-builder                         |
 
 As demais tarefas e as regras do repositório estão em
 [`CONTRIBUTING.md`](CONTRIBUTING.md) e [`AGENTS.md`](AGENTS.md).

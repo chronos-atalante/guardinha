@@ -323,7 +323,8 @@ export const ko: Messages = {
     invalidAuthTokenUri:
       '`otpauth://` 주소가 올바르지 않습니다. `otpauth://totp/`부터 주소 전체를 붙였는지, ' +
       '그리고 발급자가 라벨과 일치하는지 확인하세요.',
-    invalidAuthSecret: '설정 키는 유효한 Base32여야 합니다 (A-Z와 2-7).',
+    invalidAuthSecret:
+      '설정 키는 올바른 Base32(A-Z 및 2-7)여야 하며 128비트(16바이트) 이상이어야 합니다.',
     authTokenNotFound: '2FA 토큰을 찾을 수 없습니다.',
     internal: '금고 내부 오류.',
   },

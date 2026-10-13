@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
 import { SecureClipboardProxy } from '@zero/main/clipboard';
 import { clipboard } from '../mocks/electron.ts';
 
@@ -60,11 +61,83 @@ describe('SecureClipboardProxy', () => {
     expect(clipboard.writeText).toHaveBeenLastCalledWith('');
   });
 
-  it('dispose cancela a limpeza pendente', async () => {
+  it('dispose limpa na hora e cancela a limpeza pendente', async () => {
+    clipboard.readText.mockResolvedValue('senha');
     await proxy.copy('senha');
-    proxy.dispose();
 
+    await proxy.dispose();
+    expect(clipboard.writeText).toHaveBeenLastCalledWith('');
+
+    // e o temporizador cancelado não repete a limpeza
     await vi.advanceTimersByTimeAsync(30_000);
+    expect(clipboard.writeText).toHaveBeenCalledTimes(2);
+  });
+
+  it('dispose preserva o clipboard quando o usuário já copiou outra coisa', async () => {
+    await proxy.copy('senha');
+    clipboard.readText.mockResolvedValue('outra-coisa');
+
+    await proxy.dispose();
+
+    expect(clipboard.writeText).not.toHaveBeenCalledWith('');
     expect(clipboard.writeText).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispose sem nada copiado não escreve no clipboard', async () => {
+    await proxy.dispose();
+    expect(clipboard.writeText).not.toHaveBeenCalled();
+  });
+});
+
+describe('o temporizador do clipboard', () => {
+  let proxy: SecureClipboardProxy;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    clipboard.writeText.mockClear().mockResolvedValue(undefined);
+    clipboard.readText.mockReset().mockResolvedValue('');
+    proxy = new SecureClipboardProxy();
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  // `clearTimeout(null)` é no-op no Node, então o descuido de chamar o
+  // cancelamento sem temporizador pendente só aparece na própria chamada.
+  function spyClear(): MockInstance<typeof globalThis.clearTimeout> {
+    return vi.spyOn(globalThis, 'clearTimeout');
+  }
+
+  it('copiar duas vezes cancela o temporizador da primeira', async () => {
+    const clear = spyClear();
+    await proxy.copy('senha-a');
+
+    await proxy.copy('senha-b');
+
+    // uma vez só, e com o temporizador da primeira cópia (não `null`)
+    expect(clear).toHaveBeenCalledTimes(1);
+    expect(clear.mock.calls[0]?.[0]).not.toBeNull();
+  });
+
+  it('dispose sem temporizador pendente não chama clearTimeout', async () => {
+    const clear = spyClear();
+
+    await proxy.dispose();
+
+    expect(clear).not.toHaveBeenCalled();
+  });
+
+  it('depois que a limpeza disparou não sobra temporizador para cancelar', async () => {
+    clipboard.readText.mockResolvedValue('senha');
+    await proxy.copy('senha');
+    await vi.advanceTimersByTimeAsync(30_000);
+    const clear = spyClear();
+
+    await proxy.dispose();
+
+    expect(clear).not.toHaveBeenCalled();
   });
 });

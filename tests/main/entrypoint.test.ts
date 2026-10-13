@@ -90,6 +90,9 @@ describe('guarda de origem dos canais', () => {
     'entries:list',
     'entries:save',
     'entries:delete',
+    'authenticator:save-uri',
+    'authenticator:save',
+    'authenticator:delete',
     'generator:generate',
     'settings:get',
     'settings:set',
@@ -144,6 +147,24 @@ describe('canal clipboard:copy', () => {
     expect(() => call('clipboard:copy', appFrame(), { texto: 'x' })).toThrow(
       currentMessages().errors.internal,
     );
+  });
+});
+
+describe('canais de gravação do autenticador', () => {
+  it('recusa URI que não seja texto antes de acessar o cofre', () => {
+    expect(() => call('authenticator:save-uri', appFrame(), null)).toThrow(
+      currentMessages().errors.invalidAuthTokenUri,
+    );
+  });
+
+  it('preserva erros de sessão bloqueada ao salvar URI, token ou excluir token', () => {
+    const locked = currentMessages().errors.vaultLocked;
+    const uri = 'otpauth://totp/GitHub:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=GitHub';
+    expect(() => call('authenticator:save-uri', appFrame(), uri)).toThrow(locked);
+    expect(() => call('authenticator:save', appFrame(), {})).toThrow(locked);
+    expect(() =>
+      call('authenticator:delete', appFrame(), 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'),
+    ).toThrow(locked);
   });
 });
 

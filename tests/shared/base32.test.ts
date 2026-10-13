@@ -64,3 +64,53 @@ describe('normalização', () => {
     expect(base32Decode('====')).toBeNull();
   });
 });
+
+describe('vetores do RFC 4648', () => {
+  // Vetores fixos do anexo da RFC, e não um round-trip: um round-trip passa
+  // mesmo com o acumulador de bits começando errado, porque os dois lados
+  // erram igual. Estes números não mudam de máquina.
+  const casos: [string, string][] = [
+    ['', ''],
+    ['f', 'MY'],
+    ['fo', 'MZXQ'],
+    ['foo', 'MZXW6'],
+    ['foob', 'MZXW6YQ'],
+    ['fooba', 'MZXW6YTB'],
+    ['foobar', 'MZXW6YTBOI'],
+  ];
+
+  it('codifica cada vetor exatamente', () => {
+    for (const [texto, base32] of casos) {
+      expect(base32Encode(new TextEncoder().encode(texto))).toBe(base32);
+    }
+  });
+
+  it('decodifica cada vetor de volta', () => {
+    for (const [texto, base32] of casos) {
+      if (base32 === '') continue;
+      expect(new TextDecoder().decode(base32Decode(base32) ?? new Uint8Array())).toBe(texto);
+    }
+  });
+
+  it('descarta os bits sobrados do último grupo', () => {
+    // 'foob' são 28 bits úteis e o Base32 carrega os 5 restantes zerados, então
+    // o grupo de 32 bits representa o texto sem sobra nenhuma.
+    expect([...(base32Decode('MZXW6YQ') ?? [])]).toEqual([0x66, 0x6f, 0x6f, 0x62]);
+    expect([...(base32Decode('MZXW6YTBOI') ?? [])]).toEqual([0x66, 0x6f, 0x6f, 0x62, 0x61, 0x72]);
+  });
+});
+
+describe('isBase32 no limite de tamanho', () => {
+  it('aceita um único caractere do alfabeto', () => {
+    // O piso é 1, não 2: um segredo colado com um caractere só é curto demais
+    // para servir, mas continua sendo Base32 válido.
+    expect(isBase32('A')).toBe(true);
+    expect(isBase32('7')).toBe(true);
+  });
+
+  it('recusa o vazio e o que só tem separador', () => {
+    expect(isBase32('')).toBe(false);
+    expect(isBase32('  ')).toBe(false);
+    expect(isBase32('====')).toBe(false);
+  });
+});

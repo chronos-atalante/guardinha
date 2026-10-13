@@ -24,10 +24,13 @@ senhas dos sites que quiser. O login do dia a dia é só pelo PIN.
   sobrevive à limpeza da pasta do usuário).
 - Guarda cada credencial em um arquivo cifrado próprio (`.entries/<uuid>.zke`)
   e detecta arquivo removido ou injetado de fora do app.
+- Guarda tokens TOTP em arquivos cifrados próprios (`.auth/<uuid>.zka`); o
+  segredo nunca é devolvido ao renderer.
 - Copia usuário e senha com limpeza automática do clipboard após 30 s.
 - Abre o site da credencial no navegador padrão, gera senhas aleatórias e
   mede a força das credenciais enquanto o usuário digita.
-- Fala português do Brasil e inglês, com o idioma escolhido na Sidebar.
+- Fala português do Brasil, chinês simplificado, coreano, japonês e inglês,
+  com o idioma escolhido na Sidebar.
 - Destrói o cofre quando o usuário manda: um botão de autodestruição que
   sobrescreve e apaga tudo, um PIN de coação que abre um cofre vazio enquanto
   apaga o de verdade, e uma autodestruição opcional por tentativas da senha

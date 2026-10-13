@@ -40,7 +40,6 @@ export function base32Decode(value: string): Uint8Array | null {
   let bits = 0;
   for (const char of clean) {
     const index = ALPHABET.indexOf(char);
-    if (index < 0) return null;
     buffer = (buffer << 5) | index;
     bits += 5;
     if (bits >= 8) {
@@ -61,9 +60,9 @@ export function base32Encode(data: Uint8Array): string {
     bits += 8;
     while (bits >= 5) {
       bits -= 5;
-      out += ALPHABET[(buffer >>> bits) & 0x1f] ?? '';
+      out += ALPHABET.charAt((buffer >>> bits) & 0x1f);
     }
   }
-  if (bits > 0) out += ALPHABET[(buffer << (5 - bits)) & 0x1f] ?? '';
+  if (bits > 0) out += ALPHABET.charAt((buffer << (5 - bits)) & 0x1f);
   return out;
 }

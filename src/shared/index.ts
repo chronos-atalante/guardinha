@@ -8,6 +8,7 @@ export {
   OTP_DEFAULT_PERIOD,
   OTP_DIGIT_CHOICES,
   OTP_PERIOD_RANGE,
+  OTP_SECRET_MIN_BYTES,
   parseOtpAuthUri,
 } from '@zero/shared/otpauth';
 export type { OtpAlgorithm, OtpUri } from '@zero/shared/otpauth';

@@ -7,6 +7,7 @@ import { deleteAuth, listAuthIds, readAuthPayload, writeAuthPayload } from '@zer
 import { encryptAuthRecord } from '@zero/main/crypto';
 import { currentMessages } from '@zero/main/i18n';
 import { createVault, requireSessionKey } from '@zero/main/vault';
+import type { SaltedPayload } from '@zero/main/crypto';
 
 /**
  * O `.auth/` é um diretório que o app monta a partir de um id. Cada ramo aqui
@@ -99,5 +100,40 @@ describe('auth-store: leitura e escrita', () => {
 
   it('remover id que não está em disco não lança', () => {
     expect(() => deleteAuth('ffffffff-6666-4666-8666-666666666666')).not.toThrow();
+  });
+});
+
+describe('permissões e filtro de arquivos dos tokens', () => {
+  it('grava o .zka com 0600', () => {
+    // O token de 2FA é o segredo mais exposto do app: um arquivo 0644 seria
+    // lido por qualquer usuário da máquina e daria conta do serviço.
+    const payload: SaltedPayload = encryptAuthRecord(
+      { issuer: 'GitHub', account: 'alice', secret: 'ab' },
+      requireSessionKey(),
+    );
+    const id = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    writeAuthPayload(id, payload);
+
+    expect(fs.statSync(path.join(authDir(), `${id}.zka`)).mode & 0o777).toBe(0o600);
+    deleteAuth(id);
+  });
+
+  it('só devolve id de arquivo .zka, ignorando o que estiver ao lado', () => {
+    // O diretório `.auth` é controlado pelo app, mas um `.tmp` deixado por uma
+    // escrita interrompida não pode entrar na lista e virar um token fantasma.
+    const id = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+    writeAuthPayload(
+      id,
+      encryptAuthRecord({ issuer: 'GitHub', account: 'bob', secret: 'cd' }, requireSessionKey()),
+    );
+
+    fs.writeFileSync(path.join(authDir(), 'lixo.zkt'), 'nao e token');
+    fs.writeFileSync(path.join(authDir(), 'anotacoes.txt'), 'nao e token');
+
+    const ids = listAuthIds();
+    expect(ids).toContain(id);
+    expect(ids).not.toContain('lixo');
+    expect(ids).not.toContain('anotacoes');
+    deleteAuth(id);
   });
 });

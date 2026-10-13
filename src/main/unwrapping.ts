@@ -52,8 +52,18 @@ function asVaultKey(unwrapped: object): Buffer {
   return Buffer.from(unwrapped.key, 'hex');
 }
 
-abstract class Argon2KeyUnwrapper implements KeyUnwrapper {
-  public abstract readonly kind: CredentialKind;
+/**
+ * Embrulhador único, parametrizado pelo tipo de credencial. Não existe uma
+ * subclasse por tipo: o único comportamento que muda entre eles é o custo do
+ * Argon2id (`kdfFor`), então uma hierarquia seria quatro classes vazias e
+ * idênticas, sem polimorfismo nenhum.
+ */
+class Argon2KeyUnwrapper implements KeyUnwrapper {
+  public readonly kind: CredentialKind;
+
+  constructor(kind: CredentialKind) {
+    this.kind = kind;
+  }
 
   public get kdf(): VaultKdfParams {
     return kdfFor(this.kind);
@@ -76,45 +86,25 @@ abstract class Argon2KeyUnwrapper implements KeyUnwrapper {
   }
 }
 
-class MasterKeyUnwrapper extends Argon2KeyUnwrapper {
-  public readonly kind = 'master' as const;
-}
-
-class PinKeyUnwrapper extends Argon2KeyUnwrapper {
-  public readonly kind = 'pin' as const;
-}
-
-class RecoveryKeyUnwrapper extends Argon2KeyUnwrapper {
-  public readonly kind = 'recovery' as const;
-}
+/** Todo método de desbloqueio que sabe embrulhar a chave. */
+const KINDS: readonly CredentialKind[] = ['master', 'pin', 'recovery', 'panic'];
 
 /**
- * PIN de coação: embrulha uma chave **decoy** de 32 bytes aleatórios, sem
- * nenhuma relação com a chave real. Desembrulhar o método `panic` só prova que
- * quem digitou conhece o PIN de pânico; não entrega nada do cofre de verdade,
- * porque a chave que sai daqui nunca descriptografou um único `.zke`.
- */
-class PanicKeyUnwrapper extends Argon2KeyUnwrapper {
-  public readonly kind = 'panic' as const;
-}
-
-/**
- * Mapa de embrulhadores por tipo de credencial. Os embrulhadores são puros
- * (sem estado), então a fábrica é só este mapa + `keyUnwrapperFor`.
+ * Registro de embrulhadores por tipo de credencial (Strategy: mesma interface,
+ * a régua muda por `kind`). Os embrulhadores são puros, então uma instância
+ * por tipo serve para todo o app. Acrescentar um método de desbloqueio é uma
+ * entrada nova em `KINDS`, sem tocar em quem chama (desbloqueio, criação do
+ * cofre e redefinição de PIN).
  */
 const UNWRAPPERS: ReadonlyMap<CredentialKind, KeyUnwrapper> = new Map<CredentialKind, KeyUnwrapper>(
-  [
-    ['master', new MasterKeyUnwrapper()],
-    ['pin', new PinKeyUnwrapper()],
-    ['recovery', new RecoveryKeyUnwrapper()],
-    ['panic', new PanicKeyUnwrapper()],
-  ],
+  KINDS.map((kind) => [kind, new Argon2KeyUnwrapper(kind)]),
 );
 
 /**
- * Factory Method: o tipo de credencial resolve seu desembrulho no mapa.
- * Acrescentar um método de desbloqueio é uma entrada nova, sem tocar em quem
- * chama (desbloqueio, criação do cofre e redefinição de PIN).
+ * Resolve o desembrulho pelo tipo de credencial. Tipo fora da união não existe
+ * em tempo de compilação, mas o mapa é lido por valor vindo do container, então
+ * a forma é reconferida aqui e um nome desconhecido é erro, nunca um caminho
+ * silencioso sem custo de KDF.
  */
 export function keyUnwrapperFor(kind: CredentialKind): KeyUnwrapper {
   const found = UNWRAPPERS.get(kind);

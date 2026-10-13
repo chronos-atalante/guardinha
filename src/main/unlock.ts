@@ -26,15 +26,23 @@ export interface UnlockContext {
   vaultKey?: Buffer | undefined;
   /**
    * A falha da senha mestra cruzou o limite de autodestruição. A cadeia para
-   * aí e devolve `null` (nada a liberar), mas quem chamou precisa saber que o
-   * corte aconteceu para disparar o erase, em vez de seguir para o manifesto.
+   * aí, sem passar pelo Argon2id e sem tocar no manifesto, mas quem chamou
+   * precisa saber que o corte aconteceu para disparar o erase.
    */
   nuked?: boolean;
 }
 
 /**
+ * Resposta de um manipulador: `null` segue a cadeia, `undefined` corta a
+ * sequência sem resposta (o corte da autodestruição) e o resto encerra o
+ * desbloqueio.
+ */
+export type HandlerOutcome = VaultResult | null | undefined;
+
+/**
  * Manipulador da cadeia (Chain of Responsibility): devolve `null` para passar a
- * requisição adiante ou a resposta que encerra o desbloqueio.
+ * requisição adiante, `undefined` para parar sem resposta, ou a resposta que
+ * encerra o desbloqueio.
  */
 export abstract class UnlockHandler {
   private next: UnlockHandler | null = null;
@@ -46,14 +54,12 @@ export abstract class UnlockHandler {
   }
 
   public async handle(context: UnlockContext): Promise<VaultResult | null> {
-    const rejected = await this.process(context);
-    if (rejected !== null || this.next === null) return rejected;
+    const outcome = await this.process(context);
+    if (outcome !== null || this.next === null) return outcome ?? null;
     return this.next.handle(context);
   }
 
-  protected abstract process(
-    context: UnlockContext,
-  ): VaultResult | null | Promise<VaultResult | null>;
+  protected abstract process(context: UnlockContext): HandlerOutcome | Promise<HandlerOutcome>;
 }
 
 function wrongCredentialError(kind: UnlockInput['kind']): string {
@@ -64,15 +70,17 @@ function wrongCredentialError(kind: UnlockInput['kind']): string {
 
 /**
  * Credencial recusada: conta na trava exponencial e responde com o mesmo erro
- * de credencial errada, sem ecoar o valor digitado. Devolve `null` quando a
- * falha da senha mestra cruzou o limite de autodestruição, para que a cadeia
- * não prossiga nem tente abrir nada depois do corte.
+ * de credencial errada, sem ecoar o valor digitado. Devolve `undefined` quando a
+ * falha da senha mestra cruzou o limite de autodestruição: na cadeia, `null`
+ * significa "passe adiante" e `undefined` significa "pare", então o corte
+ * interrompe a sequência antes do Argon2id em vez de deixá-la seguir e contar a
+ * mesma tentativa duas vezes.
  */
-function credentialFailure(context: UnlockContext): VaultResult | null {
+function credentialFailure(context: UnlockContext): HandlerOutcome {
   const { state, crossed } = registerFailedAttempt(context.input.kind, context.container.nukeLimit);
   if (crossed) {
     context.nuked = true;
-    return null;
+    return undefined;
   }
   return {
     ok: false,
@@ -83,7 +91,7 @@ function credentialFailure(context: UnlockContext): VaultResult | null {
 
 /** 1. Trava exponencial: a espera vale antes de qualquer derivação. */
 class ExponentialLockoutHandler extends UnlockHandler {
-  protected process(): VaultResult | null {
+  protected process(): HandlerOutcome {
     const auth = loadAuthState();
     const remaining = getLockRemainingMs(auth);
     if (remaining <= 0) return null;
@@ -99,7 +107,7 @@ class ExponentialLockoutHandler extends UnlockHandler {
 
 /** 2. Formato: PIN de 3 dígitos não deve custar 256 MB de Argon2id. */
 class FormatValidatorHandler extends UnlockHandler {
-  protected process(context: UnlockContext): VaultResult | null {
+  protected process(context: UnlockContext): HandlerOutcome {
     const { kind, credential } = context.input;
     const valid =
       kind === 'pin' ? validatePinFormat(credential) : validateMasterPasswordFormat(credential);
@@ -111,7 +119,7 @@ class FormatValidatorHandler extends UnlockHandler {
 
 /** 3. Derivação Argon2id: o passo caro do desbloqueio. */
 class KdfDerivationHandler extends UnlockHandler {
-  protected async process(context: UnlockContext): Promise<VaultResult | null> {
+  protected async process(context: UnlockContext): Promise<HandlerOutcome> {
     const { kind, credential } = context.input;
     const method = context.container.methods[kind];
     if (method === undefined) return credentialFailure(context);
@@ -129,7 +137,7 @@ class KdfDerivationHandler extends UnlockHandler {
  * bytes; qualquer forma estranha é o mesmo erro único de credencial errada.
  */
 class VaultIntegrityHandler extends UnlockHandler {
-  protected process(context: UnlockContext): VaultResult | null {
+  protected process(context: UnlockContext): HandlerOutcome {
     const { kind } = context.input;
     const method = context.container.methods[kind];
     const derived = context.derived;

@@ -248,7 +248,7 @@ describe('panicDestroy com cofre de verdade (integração)', () => {
     const keyRef = vaultSession().keyOrNull();
     expect(keyRef).not.toBeNull();
 
-    const status = panicDestroy();
+    const status = await panicDestroy();
 
     expect(fs.existsSync(containerFile())).toBe(false);
     expect(fs.existsSync(entriesDir())).toBe(false);

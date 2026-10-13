@@ -1,4 +1,5 @@
 import { MASTER_PASSWORD_LENGTH, PIN_LENGTH } from '@zero/main/crypto';
+import { currentMessages } from '@zero/main/i18n';
 import { readAuthState, writeAuthState } from '@zero/main/storage';
 import type { PersistedAuthState } from '@zero/main/storage';
 import type { VaultStatus } from '@zero/types';
@@ -88,4 +89,16 @@ export function validateUsernameFormat(username: string): boolean {
 export function validateDomainFormat(domain: string): boolean {
   if (domain === '') return true;
   return /^([a-z0-9-]+\.)+[a-z]{2,}(\/.*)?$/i.test(domain) || /^https?:\/\//i.test(domain);
+}
+
+/**
+ * URL a abrir no navegador padrão, já normalizada com o esquema. Lança o erro
+ * localizado quando o texto não é um domínio aceitável. É regra de domínio,
+ * não transporte: o handler IPC só repassa o resultado para o `shell`.
+ */
+export function openableUrl(domain: string): string {
+  if (domain === '' || !validateDomainFormat(domain)) {
+    throw new Error(currentMessages().errors.invalidDomain);
+  }
+  return /^https?:\/\//i.test(domain) ? domain : `https://${domain}`;
 }

@@ -30,7 +30,21 @@ on:
     branches:
       - main
       - developer
+  schedule:
+    # Domingo, 04:17 UTC. Fora da hora cheia de propósito: as execuções
+    # agendadas do GitHub se concentram em :00 e a fila nesse minuto é a pior.
+    - cron: '17 4 * * 0'
   workflow_dispatch:
+    inputs:
+      min_score:
+        description: 'Reprovar se o score de mutação ficar abaixo deste valor (%)'
+        required: false
+        default: '0'
+        type: string
+      mutation_file:
+        description: 'Medir só este arquivo de src/ (repete o passo por vírgula)'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -135,9 +149,90 @@ jobs:
 
       - name: Relatório HTML da cobertura
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cobertura-relatorio
           path: coverage/
           retention-days: 14
+          if-no-files-found: ignore
+
+  mutacao:
+    name: Testes de mutação
+    # Não entra no gate de PR. A varredura completa leva cerca de 90 min na
+    # máquina de quem escreveu (`docs/mutation.md`) e bem mais nos 2 núcleos de
+    # um runner, então colocá-la em todo push deixaria o PR esperando por algo
+    # que só muda quando alguém escreve teste novo. Ela roda na madrugada e por
+    # demanda; o número vai para o resumo da execução e para o artefato.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    # O runner aborta cada mutante sozinho (240 s por padrão, `--timeout`); este
+    # teto é só para o job não ficar pendurado se algo travar fora do plano.
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Varredura de mutação
+        env:
+          MIN_SCORE: ${{ inputs.min_score || '0' }}
+          MUTATION_FILE: ${{ inputs.mutation_file }}
+        run: |
+          set -euo pipefail
+          args=(--min-score "$MIN_SCORE")
+          if [ -n "${MUTATION_FILE:-}" ]; then
+            # O `--file` se repete: um passo por arquivo, senão o runner
+            # interpretaria a lista inteira como um caminho só.
+            IFS=',' read -ra arquivos <<< "$MUTATION_FILE"
+            for arquivo in "${arquivos[@]}"; do
+              # O input vem de digitação: tira o espaço em volta de cada item,
+              # senão ` src/main/a.ts` vira um caminho que não existe.
+              limpo="${arquivo#"${arquivo%%[![:space:]]*}"}"
+              limpo="${limpo%"${limpo##*[![:space:]]}"}"
+              [ -n "$limpo" ] && args+=(--file "$limpo")
+            done
+          fi
+          npm run test:mutation -- "${args[@]}"
+
+      - name: Números da varredura na página da execução
+        if: always()
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("node:fs");
+            const file = "mutation/results.json";
+            if (!fs.existsSync(file)) process.exit(0);
+            const results = JSON.parse(fs.readFileSync(file, "utf8")).results ?? [];
+            const count = (status) => results.filter((r) => r.status === status).length;
+            // `timeout` e `compileError` ficam fora do denominador, que é como
+            // o runner calcula o score (ver `score` em `tools/mutation/run.ts`).
+            const scored = count("killed") + count("survived");
+            const score = scored === 0 ? 0 : (count("killed") / scored) * 100;
+            const rows = [
+              "## Mutação",
+              "",
+              "Score: **" + score.toFixed(1) + "%**",
+              "",
+              "| Mortos | Sobreviventes | Timeout | Erro de compilação |",
+              "| --- | --- | --- | --- |",
+              "| " + count("killed") + " | " + count("survived") + " | " + count("timeout")
+                + " | " + count("compileError") + " |",
+              "",
+              "A lista completa dos sobreviventes está no artefato `mutacao-relatorio`.",
+            ];
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, rows.join("\n") + "\n");
+          '
+
+      - name: Relatório da varredura
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutacao-relatorio
+          path: mutation/report.md
+          retention-days: 30
           if-no-files-found: ignore

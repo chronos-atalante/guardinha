@@ -380,7 +380,8 @@ describe('AuthModal: desbloqueio por PIN', () => {
     expect(screen.getByRole('button', { name: 'Desbloquear' })).toBeEnabled();
   });
 
-  it('volta ao PIN quando as tentativas caem de 3', () => {
+  it('volta ao PIN e limpa a senha mestra quando as tentativas caem de 3', async () => {
+    const user = userEvent.setup();
     const { rerender } = render(
       <MessagesProvider language="pt-BR">
         <AuthModal
@@ -391,6 +392,10 @@ describe('AuthModal: desbloqueio por PIN', () => {
     );
     expect(screen.getByRole('button', { name: 'Senha mestra' })).toBeInTheDocument();
 
+    await user.click(screen.getByRole('button', { name: 'Senha mestra' }));
+    const masterInput = screen.getByPlaceholderText('Ex.: 24 caracteres quaisquer');
+    await user.type(masterInput, MASTER);
+
     rerender(
       <MessagesProvider language="pt-BR">
         <AuthModal
@@ -400,6 +405,7 @@ describe('AuthModal: desbloqueio por PIN', () => {
       </MessagesProvider>,
     );
     expect(screen.queryByRole('button', { name: 'Senha mestra' })).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Ex.: 49201733')).toHaveValue('');
   });
 });
 

@@ -1,6 +1,7 @@
 // @vitest-environment node
 import fs from 'node:fs';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { AuthToken } from '@zero/types';
 import { authDir, vaultDir } from '@zero/main/layout';
 import {
   currentCodes,
@@ -9,18 +10,21 @@ import {
   saveToken,
   saveTokenFromUri,
 } from '@zero/main/authenticator';
-import { encryptAuthRecord } from '@zero/main/crypto';
+import { OTP_PERIOD_RANGE, OTP_SECRET_MIN_BYTES, base32Encode } from '@zero/shared';
+import { encryptAuthRecord, randomBytes } from '@zero/main/crypto';
 import { writeAuthPayload } from '@zero/main/auth-store';
 import { currentMessages } from '@zero/main/i18n';
 import { vaultStorage } from '@zero/main/facade';
 import { createVault, requireSessionKey } from '@zero/main/vault';
+import { vaultSession } from '@zero/main/session';
 
 const MASTER = 'senha-mestra-guardinha24';
 const PIN = '49201733';
 const PHRASE = 'Na feira de hoje o cavalo branco comeu exatamente doze cenouras gigantes';
 
 const TAMPERED = currentMessages().errors.vaultTampered;
-const GITHUB_URI = 'otpauth://totp/GitHub:alice@github.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub';
+const STRONG_SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+const GITHUB_URI = `otpauth://totp/GitHub:alice@github.com?secret=${STRONG_SECRET}&issuer=GitHub`;
 
 function draft(overrides: Record<string, unknown> = {}): {
   issuer: string;
@@ -36,7 +40,7 @@ function draft(overrides: Record<string, unknown> = {}): {
     algorithm: 'SHA1',
     digits: 6,
     period: 30,
-    secret: 'JBSWY3DPEHPK3PXP',
+    secret: STRONG_SECRET,
     ...overrides,
   };
 }
@@ -57,6 +61,12 @@ describe('tokens de 2FA', () => {
     expect(fs.statSync(authDir()).mode & 0o777).toBe(0o700);
   });
 
+  it('não expõe tokens nem códigos na sessão decoy', () => {
+    vi.spyOn(vaultSession(), 'isDecoy').mockReturnValue(true);
+    expect(listTokens()).toEqual([]);
+    expect(currentCodes()).toEqual([]);
+  });
+
   it('salva a partir do endereço otpauth:// e devolve os metadados', () => {
     const tokens = saveTokenFromUri(GITHUB_URI);
     expect(tokens).toHaveLength(1);
@@ -72,7 +82,7 @@ describe('tokens de 2FA', () => {
   it('NENHUM retorno carrega o segredo: só id, rótulo e parâmetros', () => {
     const [token] = saveTokenFromUri(GITHUB_URI);
     const serialized = JSON.stringify([token, listTokens(), currentCodes()]);
-    expect(serialized).not.toContain('JBSWY3DPEHPK3PXP');
+    expect(serialized).not.toContain(STRONG_SECRET);
     expect(token).not.toHaveProperty('secret');
   });
 
@@ -82,7 +92,7 @@ describe('tokens de 2FA', () => {
     expect(fs.existsSync(file)).toBe(true);
     expect(fs.statSync(file).mode & 0o777).toBe(0o600);
     const raw = fs.readFileSync(file).toString('latin1');
-    expect(raw).not.toContain('JBSWY3DPEHPK3PXP');
+    expect(raw).not.toContain(STRONG_SECRET);
     expect(raw).not.toContain('GitHub');
   });
 
@@ -95,9 +105,9 @@ describe('tokens de 2FA', () => {
 
   it('o código gerado bate com o cálculo de referência', () => {
     const [token] = saveTokenFromUri(GITHUB_URI);
-    // segredo de exemplo da wiki do Google: "Hello!" + DE AD BE EF
+    // vetor RFC 6238: a chave "12345678901234567890" em Base32
     const codes = currentCodes(1111111109 * 1000);
-    expect(codes.find((item) => item.id === token?.id)?.code).toBe('071271');
+    expect(codes.find((item) => item.id === token?.id)?.code).toBe('081804');
   });
 
   it('devolve o tempo restante do período, para a barra da tela', () => {
@@ -107,8 +117,17 @@ describe('tokens de 2FA', () => {
     expect(code?.remainingMs).toBeLessThanOrEqual(30_000);
   });
 
-  it('recusa segredo fora do alfabeto base32', () => {
+  it('recusa segredo fora do alfabeto base32 ou menor que 128 bits', () => {
     expect(() => saveToken(draft({ secret: 'JBSWY3DP1EHPK3PXP' }))).toThrow(
+      currentMessages().errors.invalidAuthSecret,
+    );
+    expect(() => saveToken(draft({ secret: 'JBSWY3DPEHPK3PXP' }))).toThrow(
+      currentMessages().errors.invalidAuthSecret,
+    );
+    expect(() => saveToken(draft({ secret: 'A'.repeat(25) }))).toThrow(
+      currentMessages().errors.invalidAuthSecret,
+    );
+    expect(() => saveToken(draft({ secret: 'AA' }))).toThrow(
       currentMessages().errors.invalidAuthSecret,
     );
     expect(() => saveToken(draft({ secret: '' }))).toThrow(
@@ -117,12 +136,64 @@ describe('tokens de 2FA', () => {
   });
 
   it('recusa parâmetros fora da faixa', () => {
+    expect(() => saveToken(draft({ algorithm: 'MD5' }))).toThrow(
+      currentMessages().errors.invalidAuthToken,
+    );
     expect(() => saveToken(draft({ digits: 7 }))).toThrow(
       currentMessages().errors.invalidAuthToken,
     );
     expect(() => saveToken(draft({ period: 0 }))).toThrow(
       currentMessages().errors.invalidAuthToken,
     );
+    expect(() => saveToken(draft({ period: 301 }))).toThrow(
+      currentMessages().errors.invalidAuthToken,
+    );
+    expect(() => saveToken(draft({ period: 30.5 }))).toThrow(
+      currentMessages().errors.invalidAuthToken,
+    );
+  });
+
+  it('recusa token sem emissor e sem conta', () => {
+    expect(() => saveToken(draft({ issuer: ' ', account: '  ' }))).toThrow(
+      currentMessages().errors.invalidAuthToken,
+    );
+  });
+
+  it('trata id vazio como criação e recusa id malformado na atualização', () => {
+    const [created] = saveToken({ ...draft(), id: '' });
+    expect(created?.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    expect(() => saveToken({ ...draft(), id: '../../fora' })).toThrow(
+      currentMessages().errors.invalidId,
+    );
+    expect(() => saveToken({ ...draft(), id: '00000000-0000-4000-8000-000000000000' })).toThrow(
+      currentMessages().errors.authTokenNotFound,
+    );
+    if (created !== undefined) removeToken(created.id);
+  });
+
+  it('pula a geração quando um segredo legado não pode ser decodificado', () => {
+    const key = requireSessionKey();
+    const id = vaultStorage.newId();
+    writeAuthPayload(
+      id,
+      encryptAuthRecord(
+        {
+          id,
+          issuer: 'Legado',
+          account: 'conta',
+          algorithm: 'SHA1',
+          digits: 6,
+          period: 30,
+          secret: '!',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        key,
+      ),
+    );
+    vaultStorage.updateManifest(key);
+    expect(currentCodes().some((code) => code.id === id)).toBe(false);
+    removeToken(id);
   });
 
   it('recusa endereço otpauth:// inválido com a mensagem do formato', () => {
@@ -138,6 +209,32 @@ describe('tokens de 2FA', () => {
     const key = requireSessionKey();
     const id = vaultStorage.newId();
     writeAuthPayload(id, encryptAuthRecord({ id, issuer: 'X', digits: 'seis' }, key));
+    expect(() => vaultStorage.readAuthSecret(id, key)).toThrow(TAMPERED);
+    removeToken(id);
+  });
+
+  it('converte falha ao decifrar um token em erro de adulteração', () => {
+    const key = requireSessionKey();
+    const id = vaultStorage.newId();
+    writeAuthPayload(
+      id,
+      encryptAuthRecord(
+        {
+          id,
+          issuer: 'GitHub',
+          account: 'alice',
+          algorithm: 'SHA1',
+          digits: 6,
+          period: 30,
+          secret: STRONG_SECRET,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        Buffer.alloc(32, 1),
+      ),
+    );
+    vaultStorage.updateManifest(key);
+
     expect(() => vaultStorage.readAuthSecret(id, key)).toThrow(TAMPERED);
     removeToken(id);
   });
@@ -164,7 +261,7 @@ describe('tokens de 2FA', () => {
           algorithm: 'SHA1',
           digits: 6,
           period: 30,
-          secret: 'JBSWY3DPEHPK3PXP',
+          secret: STRONG_SECRET,
           createdAt: 1,
           updatedAt: 1,
         },
@@ -207,4 +304,66 @@ describe('tokens de 2FA', () => {
     expect(updated[0]?.createdAt).toBe(created?.createdAt);
     removeToken(id);
   });
+});
+
+describe('regras do token que a suíte media mal', () => {
+  it('exige emissor ou conta, mas aceita qualquer um dos dois sozinho', () => {
+    // `&&` aqui vira `||` sem quebrar nenhum teste antigo: os dois campos
+    // vinham preenchidos. A regra é: rótulo vazio nos dois é inválido.
+    const semNada = (): AuthToken[] => saveToken(draft({ issuer: '   ', account: '' }));
+    const soEmissor = saveToken(draft({ issuer: 'GitHub', account: '' }));
+    const soConta = saveToken(draft({ issuer: '', account: 'alice' }));
+
+    expect(semNada).toThrow();
+    expect(soEmissor[0]?.issuer).toBe('GitHub');
+    expect(soConta[0]?.account).toBe('alice');
+    for (const token of [soEmissor[0], soConta[0]]) {
+      if (token !== undefined) removeToken(token.id);
+    }
+  });
+
+  it('aceita o período nos dois extremos da faixa e recusa o valor seguinte', () => {
+    const [min, max] = OTP_PERIOD_RANGE;
+    const ok = saveToken(draft({ period: min }));
+    const alsoOk = saveToken(draft({ period: max }));
+
+    expect(ok[0]?.period).toBe(min);
+    expect(alsoOk[0]?.period).toBe(max);
+    for (const token of [ok[0], alsoOk[0]]) {
+      if (token !== undefined) removeToken(token.id);
+    }
+
+    expect(() => saveToken(draft({ period: min - 1 }))).toThrow();
+    expect(() => saveToken(draft({ period: max + 1 }))).toThrow();
+  });
+
+  it('aceita o segredo do tamanho mínimo e recusa um byte a menos', () => {
+    // O limite é o ponto exato: `>=` trocado por `>` deixaria passar segredo
+    // curto, que é justamente o que o serviço rejeitaria depois.
+    const minimo = base32Encode(randomBytes(OTP_SECRET_MIN_BYTES));
+    const curto = base32Encode(randomBytes(OTP_SECRET_MIN_BYTES - 1));
+    const [aceito] = saveToken(draft({ secret: minimo }));
+
+    expect(aceito).toBeDefined();
+    if (aceito !== undefined) removeToken(aceito.id);
+    expect(() => saveToken(draft({ secret: curto }))).toThrow();
+  });
+
+  it('ordena a lista do token mais recente para o mais antigo', () => {
+    const [antigo] = saveToken(draft({ account: 'antigo' }));
+    const idAntigo = antigo?.id ?? '';
+    vi.setSystemTime(new Date(Date.now() + 60_000));
+    const [novo] = saveToken(draft({ account: 'novo' }));
+    const idNovo = novo?.id ?? '';
+    vi.useRealTimers();
+
+    const order = listTokens().map((token) => token.id);
+    expect(order.indexOf(idNovo)).toBeLessThan(order.indexOf(idAntigo));
+    removeToken(idAntigo);
+    removeToken(idNovo);
+  });
+});
+
+afterAll(() => {
+  vi.useRealTimers();
 });

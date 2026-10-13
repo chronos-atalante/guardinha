@@ -7,7 +7,8 @@ import { AuthTokenModal } from '@zero/renderer/components/AuthTokenModal';
 import { installApi } from '../mocks/api.ts';
 import type { AuthCode, AuthToken } from '@zero/types';
 
-const GITHUB_URI = 'otpauth://totp/GitHub:alice@github.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub';
+const GITHUB_URI =
+  'otpauth://totp/GitHub:alice@github.com?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=GitHub';
 
 function token(overrides: Partial<AuthToken> = {}): AuthToken {
   return {
@@ -61,7 +62,7 @@ describe('tela do verificador 2FA', () => {
     renderScreen([token()], [code('aaaaaaaa-1111-4111-8111-111111111111')]);
 
     expect(await screen.findByText('071271')).toBeInTheDocument();
-    expect(screen.queryByText(/JBSWY3DPEHPK3PXP/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ/)).not.toBeInTheDocument();
   });
 
   it('mostra o estado vazio com a instrução de como adicionar', async () => {
@@ -211,6 +212,28 @@ describe('tela do verificador 2FA', () => {
     });
   });
 
+  it('avisa quando não consegue atualizar um código vencido', async () => {
+    const api = installApi({ tokens: [token()] });
+    api.authenticator.codes = vi
+      .fn()
+      .mockResolvedValueOnce([code(token().id, '111111', 0)])
+      .mockRejectedValue(new Error('Falha ao atualizar códigos.'));
+    const onToast = vi.fn();
+    render(
+      <MessagesProvider language="pt-BR">
+        <Authenticator onToast={onToast} />
+      </MessagesProvider>,
+    );
+
+    expect(await screen.findByText('111111')).toBeInTheDocument();
+    await waitFor(
+      () => {
+        expect(onToast).toHaveBeenCalledWith('Falha ao atualizar códigos.');
+      },
+      { timeout: 4000 },
+    );
+  });
+
   it('abre o formulário para criar e para editar', async () => {
     const user = userEvent.setup();
     renderScreen([token()], []);
@@ -221,6 +244,80 @@ describe('tela do verificador 2FA', () => {
 
     await user.click(screen.getByTitle('Salvar'));
     expect(screen.getByText('Editar token de 2FA')).toBeInTheDocument();
+  });
+
+  it('fecha o formulário de novo token pelo botão de fechar', async () => {
+    const user = userEvent.setup();
+    renderScreen([], []);
+    await screen.findByText('Nenhum token ainda');
+
+    await user.click(screen.getByRole('button', { name: 'Adicionar token' }));
+    expect(screen.getByText('Novo token de 2FA')).toBeInTheDocument();
+    await user.click(screen.getByTitle('Fechar'));
+
+    expect(screen.queryByText('Novo token de 2FA')).not.toBeInTheDocument();
+  });
+
+  it('valida campos editados e informa falha ao salvar manualmente', async () => {
+    const user = userEvent.setup();
+    const api = installApi();
+    const save = vi.fn().mockRejectedValue(new Error('Token recusado.'));
+    api.authenticator.save = save;
+    const onError = vi.fn();
+    render(
+      <MessagesProvider language="pt-BR">
+        <AuthTokenModal
+          token={token()}
+          onClose={() => undefined}
+          onSaved={() => undefined}
+          onError={onError}
+        />
+      </MessagesProvider>,
+    );
+
+    await user.clear(screen.getByLabelText('Serviço'));
+    await user.type(screen.getByLabelText('Serviço'), 'Discord');
+    await user.clear(screen.getByLabelText('Conta'));
+    await user.type(screen.getByLabelText('Conta'), 'morgan#4321');
+    await user.clear(screen.getByLabelText('Validade (segundos)'));
+    await user.type(screen.getByLabelText('Validade (segundos)'), '60');
+    await user.type(
+      screen.getByPlaceholderText('JBSW Y3DP EHPK 3PXP'),
+      'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+    );
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    expect(await screen.findByText('Token recusado.')).toBeInTheDocument();
+    expect(onError).toHaveBeenCalledWith('Token recusado.');
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ issuer: 'Discord', account: 'morgan#4321', period: 60 }),
+    );
+  });
+
+  it('usa a mensagem padrão quando a falha ao salvar não é um Error', async () => {
+    const user = userEvent.setup();
+    const api = installApi();
+    api.authenticator.save = vi.fn().mockRejectedValue(undefined);
+    const onError = vi.fn();
+    render(
+      <MessagesProvider language="pt-BR">
+        <AuthTokenModal
+          token={token()}
+          onClose={() => undefined}
+          onSaved={() => undefined}
+          onError={onError}
+        />
+      </MessagesProvider>,
+    );
+
+    await user.type(
+      screen.getByPlaceholderText('JBSW Y3DP EHPK 3PXP'),
+      'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+    );
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    expect(await screen.findByText('Não foi possível salvar o token.')).toBeInTheDocument();
+    expect(onError).toHaveBeenCalledWith('Não foi possível salvar o token.');
   });
 
   it('avisa e recarrega depois de salvar pelo formulário', async () => {
@@ -241,6 +338,52 @@ describe('tela do verificador 2FA', () => {
 
     await waitFor(() => {
       expect(onToast).toHaveBeenCalledWith('Token salvo.');
+    });
+  });
+
+  it('propaga à tela a falha de salvar pelo formulário', async () => {
+    const user = userEvent.setup();
+    const api = installApi({ tokens: [] });
+    api.authenticator.saveUri = vi.fn().mockRejectedValue(new Error('Token recusado.'));
+    const onToast = vi.fn();
+    render(
+      <MessagesProvider language="pt-BR">
+        <Authenticator onToast={onToast} />
+      </MessagesProvider>,
+    );
+    await screen.findByText('Nenhum token ainda');
+
+    await user.click(screen.getByRole('button', { name: 'Adicionar token' }));
+    await user.type(screen.getByRole('textbox'), GITHUB_URI);
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => {
+      expect(onToast).toHaveBeenCalledWith('Token recusado.');
+    });
+  });
+
+  it('avisa quando recarregar a lista falha depois de salvar', async () => {
+    const user = userEvent.setup();
+    const api = installApi({ tokens: [] });
+    api.authenticator.saveUri = vi.fn().mockResolvedValue([]);
+    api.authenticator.list = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('Falha ao recarregar.'));
+    const onToast = vi.fn();
+    render(
+      <MessagesProvider language="pt-BR">
+        <Authenticator onToast={onToast} />
+      </MessagesProvider>,
+    );
+    await screen.findByText('Nenhum token ainda');
+
+    await user.click(screen.getByRole('button', { name: 'Adicionar token' }));
+    await user.type(screen.getByRole('textbox'), GITHUB_URI);
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => {
+      expect(onToast).toHaveBeenCalledWith('Falha ao recarregar.');
     });
   });
 
@@ -470,7 +613,8 @@ describe('modal de token', () => {
 
     // abrir para editar já vem nos campos, com o serviço preenchido
     expect(screen.getByDisplayValue('GitHub')).toBeInTheDocument();
-    await user.type(screen.getByPlaceholderText('JBSW Y3DP EHPK 3PXP'), 'MZXW6YTBOI');
+    const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+    await user.type(screen.getByPlaceholderText('JBSW Y3DP EHPK 3PXP'), secret);
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => {
@@ -478,7 +622,7 @@ describe('modal de token', () => {
         expect.objectContaining({
           id: 'aaaaaaaa-1111-4111-8111-111111111111',
           issuer: 'GitHub',
-          secret: 'MZXW6YTBOI',
+          secret,
         }),
       );
     });

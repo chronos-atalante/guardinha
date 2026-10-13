@@ -1,5 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
+import crypto from 'node:crypto';
+import { vi } from 'vitest';
 import { hotp, totp, totpRemainingMs, totpStep } from '@zero/main/totp';
 
 /**
@@ -67,6 +69,17 @@ describe('HOTP (RFC 4226)', () => {
     // 1111111111 s / 30 = 37037037 passos, exatamente o contador da RFC
     expect(totpStep(1111111111 * 1000, 30)).toBe(37037037);
   });
+
+  it('falha explicitamente se a implementação HMAC devolver digest truncado', () => {
+    const hmac = crypto.createHmac('sha1', SEED_SHA1);
+    // `Hmac.digest` é sobrecarregado (Buffer sem argumento, texto com encoding) e
+    // o `mockReturnValue` adota a última sobrecarga, que devolve string. O que o
+    // `totp.ts` chama é a forma sem argumento, que devolve o Buffer.
+    vi.spyOn(hmac, 'digest').mockReturnValue(Buffer.alloc(0) as unknown as string);
+    vi.spyOn(crypto, 'createHmac').mockReturnValue(hmac);
+
+    expect(() => hotp(SEED_SHA1, 0, 6, 'SHA1')).toThrow('digest HMAC truncado');
+  });
 });
 
 describe('TOTP (RFC 6238)', () => {
@@ -99,5 +112,39 @@ describe('tempo restante', () => {
   it('zera exatamente na virada do período', () => {
     expect(totpRemainingMs(30_000, 30)).toBe(30_000);
     expect(totpRemainingMs(29_999, 30)).toBe(1);
+  });
+});
+
+describe('passo de tempo do TOTP', () => {
+  it('usa um passo mínimo de 1 s quando o período não faz sentido', () => {
+    // Período zero ou fracionário viraria divisão por zero (ou passo fracionário)
+    // e o código sairia errado. O piso de 1 s é o que segura isso.
+    expect(totpStep(1_000_000, 0)).toBe(1_000);
+    expect(totpStep(1_000_000, 0.4)).toBe(1_000);
+  });
+
+  it('mantém a contagem regressiva entre 0 e o período inteiro', () => {
+    // A barra do renderer desenha esse número: negativo faz a barra estourar,
+    // maior que o período faz o código parecer que ainda não virou.
+    for (const period of [15, 30, 90]) {
+      for (const offset of [0, 1, period * 500 - 1, period * 1000 - 1]) {
+        const remaining = totpRemainingMs(offset, period);
+        expect(remaining).toBeGreaterThanOrEqual(0);
+        expect(remaining).toBeLessThanOrEqual(period * 1000);
+      }
+    }
+  });
+
+  it('zera a contagem quando o tempo já passou do período', () => {
+    expect(totpRemainingMs(-5_000, 30)).toBeGreaterThanOrEqual(0);
+    expect(totpRemainingMs(-5_000, 0)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('o período de 1 s tem um segundo de janela, não dois', () => {
+    // O piso de `Math.max(1, Math.floor(period))` é o que segura período zero,
+    // fracionário e menor que um. Com o piso em 2, o período de 1 s passaria a
+    // valer 2 s e a barra de contagem regressiva mentiria.
+    expect(totpRemainingMs(0, 1)).toBe(1_000);
+    expect(totpRemainingMs(1_000, 1)).toBe(1_000);
   });
 });

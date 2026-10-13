@@ -84,6 +84,7 @@ describe('EntryModal: criação', () => {
     await user.type(screen.getByLabelText('Usuário'), 'morgan');
     await user.type(screen.getByLabelText('Senha'), 'abc');
     await user.type(screen.getByLabelText('Domínio'), 'banco.com.br');
+    await user.type(screen.getByLabelText('Observações'), 'conta pessoal');
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     expect(api.entries.save).toHaveBeenCalledWith({
@@ -91,7 +92,7 @@ describe('EntryModal: criação', () => {
       username: 'morgan',
       password: 'abc',
       domain: 'banco.com.br',
-      notes: '',
+      notes: 'conta pessoal',
     });
     // criação não manda id: quem chama decide se é novo ou atualização
     expect(onChanged).toHaveBeenCalled();

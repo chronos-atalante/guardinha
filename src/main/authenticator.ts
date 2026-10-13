@@ -9,6 +9,7 @@ import {
   OTP_ALGORITHMS,
   OTP_DIGIT_CHOICES,
   OTP_PERIOD_RANGE,
+  OTP_SECRET_MIN_BYTES,
   parseOtpAuthUri,
 } from '@zero/shared';
 import type { OtpAlgorithm } from '@zero/shared';
@@ -111,9 +112,12 @@ export function saveToken(input: AuthTokenDraft): AuthToken[] {
 
   const secret = normalizeBase32(input.secret);
   const secretBytes = base32Decode(secret);
-  if (secretBytes === null || secretBytes.length === 0) {
+  if (secretBytes === null) {
     throw new Error(m.errors.invalidAuthSecret);
   }
+  const secretIsLongEnough = secretBytes.length >= OTP_SECRET_MIN_BYTES;
+  secretBytes.fill(0);
+  if (!secretIsLongEnough) throw new Error(m.errors.invalidAuthSecret);
 
   const now = Date.now();
   let id = vaultStorage.newId();

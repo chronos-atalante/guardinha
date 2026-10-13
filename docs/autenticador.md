@@ -28,12 +28,17 @@ serviço recusa.
 
 ### Formatos suportados
 
-| Parâmetro   | Valores                        | Observação    |
-| ----------- | ------------------------------ | ------------- |
-| `algorithm` | `SHA1`, `SHA256`, `SHA512`     | padrão `SHA1` |
-| `digits`    | `6`, `8`                       | padrão `6`    |
-| `period`    | 15 a 300 s                     | padrão `30`   |
-| `secret`    | Base32 (RFC 4648), sem padding | obrigatório   |
+| Parâmetro   | Valores                        | Observação                    |
+| ----------- | ------------------------------ | ----------------------------- |
+| `algorithm` | `SHA1`, `SHA256`, `SHA512`     | padrão `SHA1`                 |
+| `digits`    | `6`, `8`                       | padrão `6`                    |
+| `period`    | 15 a 300 s                     | padrão `30`                   |
+| `secret`    | Base32 (RFC 4648), sem padding | mínimo de 128 bits (16 bytes) |
+
+O cadastro recusa segredos com menos de 128 bits, conforme o mínimo exigido
+pela RFC 4226. A validação ocorre no parser compartilhado e novamente no
+processo principal; usar SHA-1, SHA-256 ou SHA-512 continua sendo uma escolha
+do serviço, não uma forma de compensar uma chave curta.
 
 ### Formato de provisionamento
 
@@ -78,6 +83,10 @@ do app (DOM, scripts da página, `guardinha://`). Um segredo TOTP em memória al
 é uma senha de servidor esperando ser lida. `AuthToken` não tem o campo
 `secret` justamente para o tipo impedir o descuido.
 
+Como consequência, ao editar um token os metadados são preenchidos, mas o
+segredo permanece em branco. Para salvar a edição pela interface atual, o
+usuário precisa informar novamente a chave Base32.
+
 ## Armazenamento
 
 Os tokens ficam em `/var/lib/.guardinha/.vault/.auth/<uuid>.zka`, um arquivo
@@ -88,6 +97,8 @@ por token, no mesmo formato dos `.zke` das credenciais:
   `guardinha-vault-auth-v1`, **diferente** do `guardinha-vault-entry-v1` das
   credenciais, para que os dois nunca derivem a mesma chave nem por acidente;
 - escrita atômica (`.tmp` + `rename`), arquivo em `0600`, pasta em `0700`.
+- cadastro exige pelo menos 128 bits de segredo, independente do algoritmo
+  HMAC selecionado.
 
 A pasta fica **dentro** de `.vault` e não como irmã por um motivo concreto: a
 raiz `/var/lib/.guardinha/` é do sistema (`root:root 0711`, criada no
@@ -99,14 +110,16 @@ token entra na mesma varredura que a credencial.
 O manifesto cifrado do cofre passou da versão 1 para a versão 2 e agora lista as
 duas coisas: `ids` (credenciais) e `authIds` (tokens).
 
-Um cofre gravado na v1 é lido sem o campo novo (a pasta `.auth` simplesmente
-nasce vazia) e volta selado na v2 na próxima escrita, **sem migração e sem
-mudança no formato do container**: o blob continua sendo um AES-256-GCM opaco.
+O código atual exige `v: 2`, com `ids` e `authIds`; não há compatibilidade com
+manifestos v1. Além disso, o container aceita somente a versão 5. Um arquivo de
+container antigo é recusado como formato incompatível antes de o manifesto ser
+aberto. O campo `v` fica dentro do blob AES-256-GCM e não altera o cabeçalho do
+container.
 
 O motivo de cobrir os tokens: sem isso, apagar um `.zka` ou plantar o seu
 próprio passaria despercebido. O segredo TOTP trocado em silêncio é exatamente
-o ataque que o manifesto existe para fechar, e `tests/main/authenticator.test.ts`
-tem o caso plantado.
+o ataque que o manifesto existe para fechar; esse comportamento é testado em
+`tests/main/authenticator.test.ts`.
 
 ## Autodestruição
 

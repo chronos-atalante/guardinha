@@ -10,7 +10,9 @@ import { readVaultContainer, writeVaultContainer } from '@zero/main/storage';
 import {
   createVault,
   getStatus,
+  isUnlocked,
   lock,
+  panicStatus,
   requireSessionKey,
   resetPin,
   unlock,
@@ -35,6 +37,7 @@ describe('ciclo de vida do cofre (integração)', () => {
     });
     expect(result.ok).toBe(true);
     expect(result.status).toMatchObject({ exists: true, locked: false, attempts: 0 });
+    expect(isUnlocked()).toBe(true);
 
     // cada método nasce com o custo do Argon2id adequado ao segredo (v3)
     const container = readVaultContainer();
@@ -42,6 +45,10 @@ describe('ciclo de vida do cofre (integração)', () => {
     expect(container?.methods.master?.kdf).toMatchObject(KDF_CREDENTIAL);
     expect(container?.methods.recovery?.kdf).toMatchObject(KDF_CREDENTIAL);
     expect(container?.methods.pin?.kdf).not.toEqual(container?.methods.master?.kdf);
+
+    // o contador de senha mestra e o limite de autodestruição nascem zerados:
+    // um cofre novo que já contasse tentativa destruiria o dado do usuário
+    expect(panicStatus()).toMatchObject({ nukeLimit: 0, attemptsMaster: 0, hasPanicPin: false });
   });
 
   it('2. recusa recriar um cofre existente', async () => {
@@ -184,6 +191,7 @@ describe('ciclo de vida do cofre (integração)', () => {
     expect(() => removeEntry('../../vault.zkv')).toThrow(currentMessages().errors.invalidId);
 
     lock();
+    expect(isUnlocked()).toBe(false);
     expect(() => listEntries()).toThrow(currentMessages().errors.vaultLocked);
   });
 

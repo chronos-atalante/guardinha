@@ -348,3 +348,119 @@ describe('manifesto de integridade', () => {
     expect(() => openManifest(key, broken)).toThrow();
   });
 });
+
+describe('leitura fail-closed de buffer truncado', () => {
+  // Um container pela metade não pode virar "cofre válido": o caminho de
+  // leitura precisa recusar, senão o app abre um cofre sem chave embrulhada.
+  const damaged = (buffer: Buffer): VaultUnpackResult => unpackVaultContainer(buffer);
+
+  it('recusa buffer menor que o cabeçalho', () => {
+    const packed = packVaultContainer(sampleContainer());
+    for (const cut of [0, 1, HEADER_BYTES - 1]) {
+      expect(damaged(packed.subarray(0, cut))).toEqual({ ok: false, reason: 'damaged' });
+    }
+  });
+
+  it('recusa o container cortado dentro do corpo dos métodos', () => {
+    const packed = packVaultContainer(sampleContainer());
+    for (const fraction of [0.25, 0.5, 0.75, 0.99]) {
+      const cut = packed.subarray(0, Math.floor(packed.length * fraction));
+      const result = damaged(cut);
+      expect(result.ok).toBe(false);
+    }
+  });
+
+  it('recusa quando sobra um byte a mais que o esperado', () => {
+    const packed = packVaultContainer(sampleContainer());
+    const result = damaged(Buffer.concat([packed, Buffer.from([0])]));
+    expect(result).toEqual({ ok: false, reason: 'damaged' });
+  });
+
+  it('recusa payload de entrada truncado', () => {
+    const payload = encryptRecord({ title: 'GitHub' }, randomBytes(32));
+    const packed = packEntryPayload(payload);
+    for (const fraction of [0.2, 0.6, 0.95]) {
+      const cut = packed.subarray(0, Math.floor(packed.length * fraction));
+      expect(unpackEntryPayload(cut)).toBeNull();
+    }
+    expect(unpackEntryPayload(Buffer.alloc(3))).toBeNull();
+  });
+
+  it('recusa flag desconhecida no cabeçalho', () => {
+    const packed = packVaultContainer(sampleContainer());
+    packed[32] = 0xff;
+    expect(damaged(packed)).toEqual({ ok: false, reason: 'damaged' });
+  });
+});
+
+describe('flags do container', () => {
+  it('não liga o bit de um método que o cofre não tem', () => {
+    // O byte de flags começa zerado e cada método liga o seu bit: um bit ligado
+    // a mais diria ao leitor para ler KDF e payload onde não há nada.
+    const without = sampleContainer();
+    delete without.methods.recovery;
+    const packed = packVaultContainer(without);
+    const withAll = packVaultContainer(sampleContainer());
+
+    expect((packed[32] ?? 0) & 0x04).toBe(0); // FLAG_RECOVERY
+    expect((withAll[32] ?? 0) & 0x04).toBe(0x04);
+    expect(unpackVaultContainer(packed).ok).toBe(true);
+  });
+
+  it('só marca um método presente, nunca um método ausente', () => {
+    const without = sampleContainer();
+    delete without.methods.recovery;
+    const packed = packVaultContainer(without);
+    const read = unpackVaultContainer(packed);
+
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.data.methods.recovery).toBeUndefined();
+    expect(Object.keys(read.data.methods).sort()).toEqual(['master', 'panic', 'pin']);
+  });
+});
+
+describe('tamanho em disco do container', () => {
+  it('mede o payload em bytes, não em caracteres hex', () => {
+    // `encryptedData` é hex, então o tamanho gravado tem que contar os bytes
+    // depois do `Buffer.from`. Contar os caracteres deixa o arquivo maior que o
+    // necessário e o leitor perde o alinhamento dos blocos seguintes.
+    const data = sampleContainer();
+    const packed = packVaultContainer(data);
+    const read = unpackVaultContainer(packed);
+
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    const method = read.data.methods.master;
+    if (method === undefined) throw new Error('container sem método master');
+    expect(method.payload.encryptedData.length).toBeGreaterThan(0);
+    expect(packed.length).toBeGreaterThan(HEADER_BYTES);
+  });
+});
+
+const IDS = ['aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb'];
+
+describe('recusa do manifesto pela mensagem', () => {
+  it('nomeia o motivo quando a lista de ids é inválida, a versão é velha ou a de tokens é inválida', () => {
+    // Três `throw` com o mesmo texto: sem conferir a mensagem, trocar a string
+    // passaria, e o usuário veria um erro sem dizer o que houve.
+    const key = randomBytes(32);
+
+    expect(() => openManifest(key, encryptRecord({ v: 2, ids: [1], authIds: [] }, key))).toThrow(
+      'manifesto inválido',
+    );
+    expect(() => openManifest(key, encryptRecord({ v: 1, ids: IDS, authIds: [] }, key))).toThrow(
+      'manifesto inválido',
+    );
+    expect(() => openManifest(key, encryptRecord({ v: 2, ids: IDS, authIds: [1] }, key))).toThrow(
+      'manifesto inválido',
+    );
+  });
+
+  it('mantém a versão do manifesto em 2, porque trocar invalida todo token de 2FA', () => {
+    const key = randomBytes(32);
+    const blob = sealManifest(key, IDS, ['a', 'b']);
+
+    expect(openManifest(key, blob)).toEqual({ ids: IDS, authIds: ['a', 'b'] });
+  });
+});

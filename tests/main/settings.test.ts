@@ -105,3 +105,15 @@ describe('loadSettings', () => {
     expect(loadSettings()).toEqual({ language: 'pt-BR' });
   });
 });
+
+describe('permissões do arquivo de preferências', () => {
+  it('grava a pasta com 0700 e o arquivo com 0600', () => {
+    // As preferências não são segredo, mas o arquivo fica dentro do HOME do
+    // usuário: 0644 deixaria qualquer outro usuário da máquina ler o idioma e,
+    // mais importante, criar o arquivo para o app escribir por cima.
+    saveSettings({ language: 'pt-BR' });
+
+    expect(fs.statSync(path.dirname(file())).mode & 0o777).toBe(0o700);
+    expect(fs.statSync(file()).mode & 0o777).toBe(0o600);
+  });
+});

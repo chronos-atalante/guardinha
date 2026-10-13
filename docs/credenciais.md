@@ -34,7 +34,7 @@ antiga, e toda gravação re-sella o manifesto de integridade.
 ## Gerador de senhas
 
 A aba **Gerador de Senhas** chama `window.api.generator.generate()` e monta a
-senha no processo main (`generateHighEntropyPassword`, em `src/main/crypto.ts`):
+senha no processo main (`generateHighEntropyPassword`, em `src/main/generator.ts`):
 
 | Opção            | Faixa / padrão                               |
 | ---------------- | -------------------------------------------- |
@@ -51,9 +51,10 @@ minúsculas, e o mesmo vale para Números e Símbolos. A última categoria ligad
 não desliga, porque sem nenhuma marcada o gerador não tem o que sortear; o
 canal `generator:generate` recusa esse caso em vez de devolver vazio.
 
-A entropia pessoal entra como salto do índice de seleção (digest SHA-512 das
-palavras somado à leitura de hardware), mantendo a escolha final uniforme sobre
-o conjunto de caracteres. Comprimento 0 devolve vazio e a tela avisa.
+A entropia pessoal entra como deslocamento do índice de seleção: um digest
+SHA-512 das palavras e 32 bytes aleatórios gerados por `crypto.randomBytes`,
+combinados com `crypto.randomInt` para manter a seleção uniforme sobre o
+conjunto de caracteres. Comprimento 0 devolve vazio e a tela avisa.
 
 ## Checagem de força
 

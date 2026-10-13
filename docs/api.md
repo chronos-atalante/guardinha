@@ -114,10 +114,10 @@ a chave do cofre e com rótulo de domínio HKDF próprio
 
 ## `window.api.settings`
 
-| Método          | Canal          | Payload → retorno           | Descrição                                                        |
-| --------------- | -------------- | --------------------------- | ---------------------------------------------------------------- |
-| `get()`         | `settings:get` | `→ AppSettings`             | `language` (`'pt-BR' \| `'en'`), default `pt-BR`.                |
-| `set(settings)` | `settings:set` | `AppSettings → AppSettings` | Normaliza e grava em `$XDG_CONFIG_HOME/guardinha/settings.json`. |
+| Método          | Canal          | Payload → retorno           | Descrição                                                                   |
+| --------------- | -------------- | --------------------------- | --------------------------------------------------------------------------- |
+| `get()`         | `settings:get` | `→ AppSettings`             | `language` (`'pt-BR' \| 'zh-CN' \| 'ko' \| 'ja' \| 'en'`), default `pt-BR`. |
+| `set(settings)` | `settings:set` | `AppSettings → AppSettings` | Normaliza e grava em `$XDG_CONFIG_HOME/guardinha/settings.json`.            |
 
 ## Tipos (`src/types/`)
 
@@ -127,7 +127,8 @@ a chave do cofre e com rótulo de domínio HKDF próprio
 - `ResetPinInput`: `{ phrase, newPin }` (frase de recuperação + novo PIN)
 - `Credential` / `CredentialInput`: registro da credencial (senha cifrada por arquivo)
 - `AuthToken`: `{ id, issuer, account, algorithm, digits, period, createdAt, updatedAt }` (sem o segredo)
-- `AuthTokenDraft`: o mesmo mais `secret` em Base32, só na entrada do `save`
+- `AuthTokenDraft`: o mesmo mais `secret` em Base32 com pelo menos 128 bits
+  (16 bytes), só na entrada do `save`
 - `AuthCode`: `{ id, code, remainingMs }`
 - `GeneratorOptions`: `{ length, useLower, useUpper, useNumbers, useSymbols, customEntropyWords }`
 - `AppSettings`: `{ language }`
