@@ -10,7 +10,7 @@ teste). O **score** é a porcentagem de mutantes mortos.
 
 Cobertura alta com score baixo é o caso comum de uma suíte que passa por cima da
 lógica sem conferir as decisões. Neste repositório os dois números são
-complementares: o limiar de 90% de cobertura é o piso, o score de mutação é o
+complementares: o limiar de 95% de cobertura é o piso, o score de mutação é o
 que diz se esse piso significa alguma coisa.
 
 ## Como rodar
@@ -131,14 +131,28 @@ Duas, e as duas importam:
 
 ## No CI
 
-A varredura roda no `quality.yml`, no job **Testes de mutação**, em todo push e
-pull_request, além do `schedule` (domingo de madrugada) e do `workflow_dispatch`.
-Ela reprova abaixo de **65%**, com o número medido hoje em 69,4%.
+A varredura roda no `quality.yml`, no job **Testes de mutação**, em outro ritmo
+do resto do workflow:
+
+| Quando dispara               | Por quê                                   |
+| ---------------------------- | ----------------------------------------- |
+| push na `developer`          | a `developer` é onde o código se move     |
+| dia 1 de cada mês, 04:17 UTC | rede de segurança quando ninguém fez push |
+| disparo manual               | remediar um arquivo sem esperar o mês     |
+
+Ela **não** roda em pull request nem em push para a `main`. A varredura leva
+horas e o número que ela mede só muda quando alguém escreve teste novo; a única
+coisa que ela faz por um PR é mudar de verde para vermelho sem dizer nada sobre o
+PR. Reprova abaixo de **65%**, com o número medido hoje em 70,2%.
 
 | Input           | Efeito                                                      |
 | --------------- | ----------------------------------------------------------- |
 | `min_score`     | piso de reprovação (padrão `65`, o que o job usa sem input) |
 | `mutation_file` | mede só esses arquivos de `src/`, separados por vírgula     |
+
+O gating é um `if:` no **job**, não no `on:` do workflow, porque "Verificar
+qualidade" e "Testes e cobertura" continuam no ritmo normal de push e PR. Job
+pulado aparece como _Skipped_ na aba de checks, que é o esperado aqui.
 
 A folga entre o piso e o número medido é de propósito. O score depende da
 máquina: mutante que estoura os 240 s vira `timeout` e sai do denominador, e o
@@ -149,8 +163,7 @@ código.
 O job **não é status check obrigatório** (as regras de proteção exigem só
 "Verificar qualidade" e "Testes e cobertura"). Ele informa e reprova sozinho,
 mas não segura o merge: prender todo PR a uma varredura de horas, para punir uma
-queda de duas décimas, não serve para ninguém. Comparar com a execução anterior
-vale mais do que um piso colado.
+queda de duas décimas, não serve para ninguém.
 
 Ele também tem **grupo de concorrência próprio** (`mutacao-...`), separado do
 `qualidade-...` do workflow. No grupo do workflow, todo push cancela a execução

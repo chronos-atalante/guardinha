@@ -81,6 +81,20 @@ describe('Cryptographic Erase (eraseVault)', () => {
     expect(fs.existsSync(entriesDir())).toBe(false);
   });
 
+  it('conta como falha o arquivo que sobrou depois da sobrescrita', () => {
+    // Sem permissão de escrita, o shred não consegue sobrescrever e o arquivo
+    // fica onde está. O relatório precisa dizer `failed` em vez de contar como
+    // shredded: é esse número que o chamador usa para saber se o disco limpou.
+    seedVault([]);
+    const preso = path.join(vaultDir(), 'preso.zkv.tmp');
+    fs.writeFileSync(preso, 'conteudo', { mode: 0o000 });
+
+    const result = eraseVault();
+
+    expect(result.failed).toBeGreaterThanOrEqual(1);
+    expect(fs.existsSync(preso)).toBe(true);
+  });
+
   it('apaga os tokens de 2FA e a pasta .auth junto com o resto', () => {
     // um segredo TOTP que sobrevive ao Cryptographic Erase é uma senha de
     // servidor que sobrevive a ele, então esta é a asserção mais importante
@@ -257,5 +271,23 @@ describe('panicDestroy com cofre de verdade (integração)', () => {
     // o Buffer realmente zerado, não só sem referência
     expect(keyRef?.every((byte) => byte === 0)).toBe(true);
     expect(status).toMatchObject({ exists: false, locked: true });
+  });
+
+  it('conta como falha o temporário que sobrou depois da sobrescrita', () => {
+    // Um `.tmp` que o shred não consegue apagar (sem permissão de escrita) não
+    // pode passar por sucesso: o relatório de apagar o cofre tem de dizer que
+    // sobrou arquivo, porque é esse número que o `erase` devolve a quem decide.
+    seedVault([]);
+    const preso = path.join(vaultDir(), 'preso.zkv.tmp');
+    fs.writeFileSync(preso, 'conteudo', { mode: 0o000 });
+    const velho = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    fs.utimesSync(preso, velho, velho);
+
+    const result = cleanStaleTempFiles(60_000);
+
+    // sem permissão o shred falha e o arquivo continua lá: não foi removido, e
+    // também não foi contado como removido
+    expect(result.removed).toBe(0);
+    expect(fs.existsSync(preso)).toBe(true);
   });
 });

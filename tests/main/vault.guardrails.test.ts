@@ -1,12 +1,13 @@
 // @vitest-environment node
 import fs from 'fs-extra';
 import path from 'node:path';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { currentMessages } from '@zero/main/i18n';
 import { clearDestroyedFlag } from '@zero/main/erasure-state';
 import { vaultSession } from '@zero/main/session';
 import * as unwrapping from '@zero/main/unwrapping';
 import {
+  clearPanicPin,
   createVault,
   getStatus,
   panicStatus,
@@ -211,6 +212,32 @@ describe('cofre ausente', () => {
     expect(panicStatus()).toEqual({ hasPanicPin: false, nukeLimit: 0, attemptsMaster: 0 });
   });
 
+  it('unlock diz que o cofre não existe', async () => {
+    const result = await unlock({ credential: PIN, kind: 'pin' });
+
+    expect(result).toMatchObject({ ok: false, error: m.errors.vaultMissing });
+  });
+
+  it('setNukeLimit diz que o cofre não existe', () => {
+    const result = setNukeLimit(50);
+
+    expect(result).toMatchObject({ ok: false, error: m.errors.vaultMissing });
+  });
+
+  it('resetPin diz que o cofre não existe, sem gastar tentativa', async () => {
+    const result = await resetPin({ newPin: OTHER_PIN, phrase: PHRASE });
+
+    expect(result).toMatchObject({ ok: false, error: m.errors.vaultMissing });
+    // nenhuma contagem de tentativa: sem cofre não houve tentativa nenhuma
+    expect(readAuthState()).toEqual(NEUTRAL);
+  });
+
+  it('clearPanicPin não explode e devolve o estado neutro', () => {
+    // Sem container não há PIN de coação para remover, e a função precisa
+    // devolver o status assim mesmo em vez de estourar em cima do chamador.
+    expect(clearPanicPin()).toMatchObject({ exists: false, attempts: 0, lockUntil: null });
+  });
+
   it('escrever estado de trava não recria o cofre do nada', () => {
     writeAuthState({ ...NEUTRAL, attempts: 2, lockUntil: Date.now() + 1000 });
     expect(getStatus().exists).toBe(false);
@@ -228,5 +255,116 @@ describe('piso do limite de autodestruição', () => {
     );
     expect(setNukeLimit(0).ok).toBe(true);
     expect(panicStatus().nukeLimit).toBe(0);
+  });
+});
+
+/**
+ * As operações do cofre com o arquivo ausente. Sem o cofre não há nada a
+ *Protectir, e cada função tem que dizer "cofre inexistente" em vez de estourar
+ * em cima do chamador ou, pior, gravar alguma coisa.
+ */
+
+/**
+ * Os três casos abaixo precisam de um cofre **aberto** e depois sem container, o
+ * que os blocos de cima não deixam: eles trocam o PIN e, no caminho, apagam o
+ * arquivo. Aqui a pasta é própria e o cofre nasce com o PIN conhecido, para que
+ * a ordem dos testes não mude o que está sendo coberto.
+ */
+describe('cofre aberto que some no meio do caminho', () => {
+  let previousDir: string | undefined;
+  let dir: string;
+
+  beforeAll(async () => {
+    previousDir = process.env.GUARDINHA_VAULT_DIR;
+    dir = fs.mkdtempSync(path.join(process.env.HOME ?? '/tmp', 'cofre-que-some-'));
+    process.env.GUARDINHA_VAULT_DIR = dir;
+    const result = await createVault({
+      masterPassword: MASTER,
+      pin: PIN,
+      recoveryPhrase: PHRASE,
+    });
+    expect(result.ok).toBe(true);
+  }, 120_000);
+
+  afterEach(() => {
+    clearDestroyedFlag();
+    writeAuthState(NEUTRAL);
+  });
+
+  // Sem isto o `GUARDINHA_VAULT_DIR` apontando para a pasta temporária vazia
+  // vazaria para os outros arquivos de teste que rodarem no mesmo worker.
+  afterAll(() => {
+    if (previousDir === undefined) delete process.env.GUARDINHA_VAULT_DIR;
+    else process.env.GUARDINHA_VAULT_DIR = previousDir;
+  });
+
+  /** Some com o container e devolve a função que o restaura. */
+  function semContainer(): () => void {
+    const arquivo = containerFile();
+    const backup = fs.readFileSync(arquivo);
+    fs.rmSync(arquivo, { force: true });
+    return () => fs.writeFileSync(arquivo, backup);
+  }
+
+  async function abrir(): Promise<void> {
+    const result = await unlock({ credential: PIN, kind: 'pin' });
+    expect(result.ok).toBe(true);
+  }
+
+  it('setPanicPin diz que o cofre não existe em vez de gravar por cima', async () => {
+    // A ordem importa: primeiro o cofre abre (senão a função responde "travado"
+    // antes de olhar o arquivo), e só então o container some. É o estado em que
+    // um `read-modify-write` apagaria a credencial real e deixaria o cofre de
+    // coação apontando para nada.
+    await abrir();
+    const restaurar = semContainer();
+    try {
+      const result = await setPanicPin({ pin: OTHER_PIN });
+
+      expect(result).toMatchObject({ ok: false, error: m.errors.vaultMissing });
+    } finally {
+      restaurar();
+    }
+  });
+
+  it('resetPin diz que a frase está errada quando o método sumiu', async () => {
+    // Um container sem `recovery` é um cofre cuja frase não existe mais. A
+    // resposta tem que ser a de frase errada, e não uma exceção: essa é a única
+    // porta que sobrou para quem tem o PIN e não tem a frase.
+    await abrir();
+    const arquivo = containerFile();
+    const { readVaultContainer, writeVaultContainer } = await import('@zero/main/storage');
+    const data = readVaultContainer();
+    if (data === null) throw new Error('container de teste ausente');
+    const backup = fs.readFileSync(arquivo);
+    delete data.methods.recovery;
+    writeVaultContainer(data);
+
+    try {
+      const result = await resetPin({ newPin: OTHER_PIN, phrase: PHRASE });
+
+      expect(result).toMatchObject({ ok: false, error: m.errors.wrongRecovery });
+    } finally {
+      fs.writeFileSync(arquivo, backup);
+    }
+  });
+
+  it('erro sem mensagem cai no texto de fallback, e não na tela vazia', async () => {
+    // `errorMessage` só confia na mensagem do `Error` quando ela diz alguma
+    // coisa. Um erro sem texto viraria string vazia na interface, que o usuário
+    // lê como "o app não disse nada" em vez de "o cofre foi adulterado".
+    const { vaultStorage } = await import('@zero/main/facade');
+    const leitura = vi.spyOn(vaultStorage, 'readContainer').mockImplementation(() => {
+      throw new Error('');
+    });
+
+    try {
+      const result = await unlock({ credential: PIN, kind: 'pin' });
+
+      expect(result).toMatchObject({ ok: false, error: m.errors.vaultTampered });
+      expect(result.error).not.toBe('');
+    } finally {
+      leitura.mockRestore();
+    }
   });
 });

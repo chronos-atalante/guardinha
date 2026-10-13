@@ -13,6 +13,7 @@ import {
 } from '../mocks/electron.ts';
 import type { IpcHandler } from '../mocks/electron.ts';
 import { currentMessages } from '@zero/main/i18n';
+import { vaultSession } from '@zero/main/session';
 import '@zero/main/index';
 
 /**
@@ -368,5 +369,36 @@ describe('cofre inexistente', () => {
     // de criação depende de ele responder em vez de lançar
     const status = call('vault:status', appFrame()) as { exists: boolean };
     expect(typeof status.exists).toBe('boolean');
+  });
+});
+
+describe('aviso de sessão perdida', () => {
+  it('empurra vault:auto-locked quando o cofre trava no meio de uma operação', () => {
+    // Os canais que exigem a chave (`entries:list`) estouram com "cofre
+    // travado" se o auto-lock disparar entre a tela pedir os dados e o main
+    // responder. O renderer precisa saber pelo mesmo canal do auto-lock, senão
+    // fica chamando um cofre que não existe mais e a tela trava sem dizer nada.
+    if (BOOT_WINDOW === undefined) throw new Error('nenhuma janela criada no boot');
+    vaultSession().wipe();
+
+    expect(() => call('entries:list', appFrame())).toThrow();
+
+    expect(BOOT_WINDOW.webContents.send).toHaveBeenCalledWith(
+      'vault:auto-locked',
+      expect.objectContaining({ locked: true }),
+    );
+  });
+
+  it('operação sem chave não empurra o aviso de sessão', () => {
+    // `settings:get` não passa por `withSessionNotice`: um erro dele não tem
+    // nada a ver com o cofre ter travado, e mandar o aviso ali faria a tela
+    // pular para a autenticação sem necessidade.
+    if (BOOT_WINDOW === undefined) throw new Error('nenhuma janela criada no boot');
+    vaultSession().wipe();
+    BOOT_WINDOW.webContents.send.mockClear();
+
+    call('settings:get', appFrame());
+
+    expect(BOOT_WINDOW.webContents.send).not.toHaveBeenCalled();
   });
 });
