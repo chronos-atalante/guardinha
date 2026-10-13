@@ -29,6 +29,59 @@ describe('guardas de navegação e sessão', () => {
     expect(webPreferences.devTools).toBe(true);
   });
 
+  it('as demais bandeiras de webPreferences estão travadas no certo lado', async () => {
+    // Quatro flags de uma vez, e cada uma é uma linha de defesa do renderer
+    // contra o próprio app: `nodeIntegration` ligado daria ao renderer o `require`
+    // do Node, `webSecurity` desligado tiraria a SOP, e `preload` ausente
+    // deixaria a interface sem `window.api`. Nenhuma delas pode virar `true` por
+    // distração, então o teste fixa o valor literal em vez de derivar de outro.
+    const win = await waitForWindow();
+    const webPreferences = win.options.webPreferences as Record<string, unknown>;
+    expect(webPreferences.nodeIntegration).toBe(false);
+    expect(webPreferences.webSecurity).toBe(true);
+    expect(webPreferences.sandbox).toBe(true);
+    expect(webPreferences.contextIsolation).toBe(true);
+    expect(typeof webPreferences.preload).toBe('string');
+  });
+
+  it('a janela nasce escondida e só aparece quando o Electron diz que está pronta', async () => {
+    // `show: false` evita o flash de janela branca antes do primeiro paint, e o
+    // `ready-to-show` é o evento que libera a exibição.
+    const win = await waitForWindow();
+    expect(win.options.show).toBe(false);
+
+    const ready = win.once.mock.calls.find(([event]) => event === 'ready-to-show')?.[1];
+    expect(ready).toBeTypeOf('function');
+    win.show.mockClear();
+    ready?.();
+    expect(win.show).toHaveBeenCalledOnce();
+  });
+
+  it('a janela tem o tamanho e o título que o app promete', async () => {
+    const win = await waitForWindow();
+    expect(win.options.width).toBe(1200);
+    expect(win.options.height).toBe(800);
+    expect(win.options.minWidth).toBe(520);
+    expect(win.options.minHeight).toBe(360);
+    expect(win.options.title).toBe('Guardinha');
+    expect(win.options.backgroundColor).toBe('#020617');
+  });
+
+  it('activate com janela aberta não cria uma segunda', async () => {
+    // O `activate` do macOS chega com a janela já viva quando o usuário clica no
+    // ícone do Dock com o app em segundo plano; criar outra ali deixaria duas
+    // janelas do mesmo cofre, com duas telas de autenticação.
+    const win = await waitForWindow();
+    const activate = app.on.mock.calls.find(([event]) => event === 'activate')?.[1];
+    expect(activate).toBeTypeOf('function');
+    const antes = BrowserWindow.instances.length;
+    BrowserWindow.getAllWindows.mockReturnValue([win]);
+
+    activate?.();
+
+    expect(BrowserWindow.instances).toHaveLength(antes);
+  });
+
   it('will-navigate recusa URL fora da página do app', async () => {
     const win = await waitForWindow();
     const navigation = win.webContents.on.mock.calls.find(([event]) => event === 'will-navigate');

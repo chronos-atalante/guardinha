@@ -19,11 +19,12 @@ name: Qualidade
 # "Verificar qualidade" como status checks obrigatórios nas regras de proteção
 # da `main` (Settings > Branches > Branch protection rules).
 #
-# "Testes de mutação" roda em todo push e pull_request, mas de propósito NÃO é
-# status check obrigatório: a varredura completa leva horas, e segurar o merge
-# por ela castiga todo PR por um número que muda devagar. Ela reprova sozinha
-# abaixo de 65% (piso ajustável pelo disparo manual), então a queda real aparece
-# como build vermelho sem virar trava de branch.
+# "Testes de mutação" roda em outro ritmo, porque a varredura completa leva
+# horas e o número que ela mede só muda quando alguém escreve teste novo: ela
+# dispara em push para a `developer`, uma vez por mês no agendamento e no disparo
+# manual, e **não** em pull request nem em push para a `main`. Reprova abaixo de
+# 65% (piso ajustável pelo disparo manual), então a queda real aparece como build
+# vermelho sem virar trava de branch.
 #
 # Actions fixadas por SHA completo (com a tag na comentário) para não depender de
 # segurança da tag movível; o Dependabot (`github-actions`) atualiza os pins.
@@ -37,9 +38,10 @@ on:
       - main
       - developer
   schedule:
-    # Domingo, 04:17 UTC. Fora da hora cheia de propósito: as execuções
-    # agendadas do GitHub se concentram em :00 e a fila nesse minuto é a pior.
-    - cron: '17 4 * * 0'
+    # Dia 1 de cada mês, 04:17 UTC. Fora da hora cheia de propósito: as
+    # execuções agendadas do GitHub se concentram em :00 e a fila nesse minuto é
+    # a pior.
+    - cron: '17 4 1 * *'
   workflow_dispatch:
     inputs:
       min_score:
@@ -164,11 +166,21 @@ jobs:
 
   mutacao:
     name: Testes de mutação
-    # Roda em todo push e pull_request, além do agendamento e do disparo manual.
-    # Não é status check obrigatório (as regras de proteção do repositório exigem
-    # só "Verificar qualidade" e "Testes e cobertura"), então a varredura
-    # informa sem segurar o merge: ela leva horas e reprovar um PR inteiro
-    # porque o score caiu duas décimos não serve para ninguém.
+    # A varredura completa leva horas, e o que ela mede muda devagar: só quando
+    # alguém escreve teste novo. Então ela **não** roda em pull request e nem em
+    # push para a `main`: roda quando a `developer` recebe um push (para não
+    # passar meses com o número velho), uma vez por mês no agendamento, e no
+    # disparo manual, que é a válvula de escape quando se quer remediar um
+    # arquivo específico sem esperar o mês.
+    #
+    # Este `if` é do job, e não do `on:` do workflow, porque "Verificar
+    # qualidade" e "Testes e cobertura" continuam no ritmo normal de push e PR.
+    # Job pulado aparece como *Skipped* na aba de checks, o que é o esperado
+    # aqui: não é status check obrigatório.
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/developer')
+      || github.event_name == 'schedule'
+      || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     # Grupo próprio, e não o do workflow: lá, todo push cancela a execução
     # anterior, o que mataria uma varredura de horas no meio sem que ninguém
