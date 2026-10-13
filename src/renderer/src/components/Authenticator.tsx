@@ -4,6 +4,8 @@ import { Copy, KeyRound, Plus, Trash2 } from 'lucide-react';
 import { richText, useMessages } from '@zero/renderer/i18n';
 import { copyAndAutoClear } from '@zero/renderer/clipboard';
 import { AuthTokenModal } from '@zero/renderer/components/AuthTokenModal';
+import { errorMessage } from '@zero/shared';
+import { useLatest } from '@zero/renderer/hooks';
 import type { AuthCode, AuthToken } from '@zero/types';
 
 /**
@@ -22,14 +24,13 @@ interface AuthenticatorProps {
   onToast: (message: string) => void;
 }
 
+/** Passo do relógio da contagem regressiva e da virada de período do TOTP. */
+const TICK_MS = 1000;
+
 /** Código exibido com o instante em que deixa de valer. */
 interface ShownCode {
   code: string;
   expiresAt: number;
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message !== '' ? error.message : fallback;
 }
 
 export function Authenticator({ onToast }: AuthenticatorProps): JSX.Element {
@@ -40,6 +41,10 @@ export function Authenticator({ onToast }: AuthenticatorProps): JSX.Element {
   const [modal, setModal] = useState<AuthToken | 'new' | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<AuthToken | null>(null);
   const [now, setNow] = useState(() => Date.now());
+
+  // fora das dependências: recarregar tokens e códigos a cada troca de idioma
+  // seria buscar de novo por causa de um texto de toast que talvez nem apareça
+  const loadError = useLatest(m.authenticator.loadError);
 
   const loadCodes = useCallback(async (): Promise<void> => {
     const fetchedAt = Date.now();
@@ -68,10 +73,10 @@ export function Authenticator({ onToast }: AuthenticatorProps): JSX.Element {
 
   useEffect(() => {
     void reload().catch((error: unknown) => {
-      onToast(errorMessage(error, m.authenticator.loadError));
+      onToast(errorMessage(error, loadError.current));
       setLoading(false);
     });
-  }, [reload, onToast, m.authenticator.loadError]);
+  }, [reload, onToast, loadError]);
 
   // Tique de 1 s para a contagem; quando algum código vence, pede os novos.
   // Um tique por token resolveria o mesmo problema com muito mais temporizador.
@@ -82,14 +87,14 @@ export function Authenticator({ onToast }: AuthenticatorProps): JSX.Element {
       const expired = Object.values(codes).some((item) => item.expiresAt <= current);
       if (expired) {
         void loadCodes().catch((error: unknown) => {
-          onToast(errorMessage(error, m.authenticator.loadError));
+          onToast(errorMessage(error, loadError.current));
         });
       }
-    }, 1000);
+    }, TICK_MS);
     return () => {
       clearInterval(timer);
     };
-  }, [codes, loadCodes, onToast, m.authenticator.loadError]);
+  }, [codes, loadCodes, onToast, loadError]);
 
   const handleCopy = (shown: ShownCode): void => {
     void copyAndAutoClear(shown.code)

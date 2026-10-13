@@ -15,10 +15,12 @@ import {
 import { deleteAuth, listAuthIds, readAuthPayload, writeAuthPayload } from '@zero/main/auth-store';
 import {
   initManifest,
+  readAuthState,
   readVaultContainer,
   updateManifest,
   vaultExists,
   verifyManifest,
+  writeAuthState,
   writeVaultContainer,
 } from '@zero/main/storage';
 import { ensureVaultStructure, isVaultDirUnavailable, vaultPath } from '@zero/main/structure';
@@ -27,8 +29,12 @@ import { eraseVault } from '@zero/main/erase';
 import { currentMessages } from '@zero/main/i18n';
 import { OTP_ALGORITHMS } from '@zero/shared';
 import type { OtpAlgorithm } from '@zero/shared';
+import type { PersistedAuthState } from '@zero/main/storage';
 import type { VaultContainerData } from '@zero/main/container';
 import type { Credential, EraseResult } from '@zero/types';
+
+/** Estado da trava que mora dentro do container; repassado para quem usa. */
+export type { PersistedAuthState };
 
 function tampered(): Error {
   return new Error(currentMessages().errors.vaultTampered);
@@ -109,9 +115,9 @@ function asAuthSecret(value: object): AuthSecret | null {
 
 /**
  * Fachada única do cofre sobre `fs-extra`, AES-256-GCM e o manifesto
- * (`.zke`, `.zka` e `.zkv`): `vault.ts`, `entries.ts` e `authenticator.ts` pedem
- * operações de alto nível aqui e nunca tocam sistema de arquivos, cifra ou
- * pacote binário direto.
+ * (`.zke`, `.zka` e `.zkv`): `vault.ts`, `entries.ts`, `auth.ts` e
+ * `authenticator.ts` pedem operações de alto nível aqui e nunca tocam sistema
+ * de arquivos, cifra ou pacote binário direto.
  */
 export class VaultStorageFacade {
   // ---------- Estrutura e localização ----------
@@ -153,6 +159,24 @@ export class VaultStorageFacade {
 
   public writeContainer(data: VaultContainerData): void {
     writeVaultContainer(data);
+  }
+
+  // ---------- Trava exponencial (campos do container) ----------
+
+  /**
+   * Estado de tentativas e trava. Nunca lança: cofre ausente ou ilegível
+   * devolve o estado neutro, para o `getStatus` não virar erro.
+   */
+  public readAuthState(): PersistedAuthState {
+    return readAuthState();
+  }
+
+  /**
+   * Grava tentativas, trava e limite no container. É read-modify-write, então
+   * passa por `writeVaultContainer`, que recusa escrever depois de um erase.
+   */
+  public writeAuthState(state: PersistedAuthState): void {
+    writeAuthState(state);
   }
 
   // ---------- Manifesto de integridade ----------

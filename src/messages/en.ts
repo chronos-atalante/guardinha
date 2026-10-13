@@ -24,6 +24,7 @@ export const en: Messages = {
     name: 'Guardinha',
     subtitle: 'Otaku Delirante',
     statusLocal: '100% Local / Encrypted',
+    statusLabel: 'Status:',
     nav: {
       home: 'Home (Passwords)',
       generator: 'Password Generator',

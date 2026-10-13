@@ -13,6 +13,9 @@ import { DestroyModal } from '@zero/renderer/components/DestroyModal';
 import { Toast } from '@zero/renderer/components/Toast';
 import type { Language, VaultStatus } from '@zero/types';
 
+/** Rede de segurança do auto-lock: o Observer do main é quem avisa, isto é o plano B. */
+const STATUS_POLL_MS = 15_000;
+
 interface ShellProps {
   status: VaultStatus | null;
   language: Language;
@@ -25,6 +28,10 @@ function Shell({ status, language, onLanguageChange, onRefresh }: ShellProps): J
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [toast, setToast] = useState<string | null>(null);
   const [confirmDestroy, setConfirmDestroy] = useState(false);
+
+  const closeToast = useCallback((): void => setToast(null), []);
+  const askDestroy = useCallback((): void => setConfirmDestroy(true), []);
+  const cancelDestroy = useCallback((): void => setConfirmDestroy(false), []);
 
   const handleLock = async (): Promise<void> => {
     await window.api.vault.lock();
@@ -60,7 +67,7 @@ function Shell({ status, language, onLanguageChange, onRefresh }: ShellProps): J
         onLock={() => {
           void handleLock();
         }}
-        onDestroy={() => setConfirmDestroy(true)}
+        onDestroy={askDestroy}
       />
       <main className="flex-1 bg-slate-950 overflow-y-auto p-8">
         {activeTab === 'home' && <Home onToast={setToast} />}
@@ -69,13 +76,8 @@ function Shell({ status, language, onLanguageChange, onRefresh }: ShellProps): J
         {activeTab === 'credits' && <Credits />}
         {activeTab === 'settings' && <Settings />}
       </main>
-      {confirmDestroy && (
-        <DestroyModal
-          onClose={() => setConfirmDestroy(false)}
-          onDestroyed={() => handleDestroyed()}
-        />
-      )}
-      <Toast message={toast} onClose={() => setToast(null)} />
+      {confirmDestroy && <DestroyModal onClose={cancelDestroy} onDestroyed={handleDestroyed} />}
+      <Toast message={toast} onClose={closeToast} />
     </div>
   );
 }
@@ -103,8 +105,8 @@ export default function App(): JSX.Element {
 
   const unlocked = status !== null && status.exists && !status.locked;
 
-  // Observer: o main avisa no auto-lock. O polling de 15 s fica como rede de
-  // segurança (rede, IPC e renderer podem falhar por conta própria).
+  // Observer: o main avisa no auto-lock. O polling fica como rede de segurança
+  // (rede, IPC e renderer podem falhar por conta própria).
   useEffect(() => {
     if (!unlocked) return;
     const unsubscribe = window.api.vault.onAutoLocked(() => {
@@ -112,7 +114,7 @@ export default function App(): JSX.Element {
     });
     const timer = setInterval(() => {
       void refreshStatus();
-    }, 15000);
+    }, STATUS_POLL_MS);
     return () => {
       unsubscribe();
       clearInterval(timer);

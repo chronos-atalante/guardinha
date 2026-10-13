@@ -7,8 +7,6 @@ import {
   registerFailedAttempt,
   resetAttempts,
   validateDomainFormat,
-  validateMasterPasswordFormat,
-  validatePinFormat,
   validateUsernameFormat,
 } from '@zero/main/auth';
 import { writeVaultContainer } from '@zero/main/storage';
@@ -169,19 +167,6 @@ describe('contadores separados por método (atemptsMaster)', () => {
 });
 
 describe('validações de formato', () => {
-  it('senha mestra: exatamente 24 caracteres', () => {
-    expect(validateMasterPasswordFormat('senha-mestra-guardinha24')).toBe(true);
-    expect(validateMasterPasswordFormat('curta')).toBe(false);
-    expect(validateMasterPasswordFormat('senha-mestra-guardinha24x')).toBe(false);
-  });
-
-  it('PIN: exatamente 8 dígitos', () => {
-    expect(validatePinFormat('49201733')).toBe(true);
-    expect(validatePinFormat('4920173')).toBe(false);
-    expect(validatePinFormat('4920173a')).toBe(false);
-    expect(validatePinFormat('4920 733')).toBe(false);
-  });
-
   it('usuário: palavra, kebab-case ou snake_case', () => {
     expect(validateUsernameFormat('')).toBe(true);
     expect(validateUsernameFormat('chronos')).toBe(true);

@@ -1,13 +1,12 @@
-import { MASTER_PASSWORD_LENGTH, PIN_LENGTH } from '@zero/main/crypto';
+import { vaultStorage } from '@zero/main/facade';
 import { currentMessages } from '@zero/main/i18n';
-import { readAuthState, writeAuthState } from '@zero/main/storage';
-import type { PersistedAuthState } from '@zero/main/storage';
+import type { PersistedAuthState } from '@zero/main/facade';
 import type { VaultStatus } from '@zero/types';
 
-const PENALTY_DELAYS_SECONDS = [10, 30, 60, 3600, 86400]; // 10s, 30s, 1m, 1h, 24h
+const PENALTY_DELAYS_SECONDS = [10, 30, 60, 3600, 86400] as const; // 10s, 30s, 1m, 1h, 24h
 
 export function loadAuthState(): PersistedAuthState {
-  return readAuthState();
+  return vaultStorage.readAuthState();
 }
 
 /** Visão do cofre para a interface: existe, está travado e quanto falta da espera. */
@@ -27,7 +26,7 @@ export function statusFrom(
 
 export function calculateLockout(attemptCount: number): number {
   const index = Math.min(attemptCount - 1, PENALTY_DELAYS_SECONDS.length - 1);
-  const delaySec = PENALTY_DELAYS_SECONDS[Math.max(0, index)] ?? 10;
+  const delaySec = PENALTY_DELAYS_SECONDS[Math.max(0, index)] ?? PENALTY_DELAYS_SECONDS[0];
   return Date.now() + delaySec * 1000;
 }
 
@@ -52,7 +51,7 @@ export function registerFailedAttempt(
   kind: 'master' | 'pin',
   nukeLimit = 0,
 ): { state: PersistedAuthState; crossed: boolean } {
-  const current = readAuthState();
+  const current = vaultStorage.readAuthState();
   const attempts = current.attempts + 1;
   const attemptsMaster = kind === 'master' ? current.attemptsMaster + 1 : current.attemptsMaster;
   const state: PersistedAuthState = {
@@ -61,22 +60,19 @@ export function registerFailedAttempt(
     attemptsMaster,
     nukeLimit,
   };
-  writeAuthState(state);
+  vaultStorage.writeAuthState(state);
   return { state, crossed: nukeLimit > 0 && attemptsMaster >= nukeLimit };
 }
 
 export function resetAttempts(): void {
-  const current = readAuthState();
+  const current = vaultStorage.readAuthState();
   // `nukeLimit` sobrevive ao reset: é configuração do cofre, não estado de trava
-  writeAuthState({ attempts: 0, lockUntil: null, attemptsMaster: 0, nukeLimit: current.nukeLimit });
-}
-
-export function validateMasterPasswordFormat(password: string): boolean {
-  return password.length === MASTER_PASSWORD_LENGTH;
-}
-
-export function validatePinFormat(pin: string): boolean {
-  return new RegExp(`^\\d{${PIN_LENGTH}}$`).test(pin);
+  vaultStorage.writeAuthState({
+    attempts: 0,
+    lockUntil: null,
+    attemptsMaster: 0,
+    nukeLimit: current.nukeLimit,
+  });
 }
 
 export function validateUsernameFormat(username: string): boolean {

@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   KDF_CREDENTIAL,
   KDF_PIN,
-  MASTER_PASSWORD_LENGTH,
-  RECOVERY_MIN_WORDS,
   decryptAuthRecord,
   decryptRecord,
   deriveAuthKey,
@@ -17,6 +15,7 @@ import {
   normalizeRecoveryPhrase,
   randomBytes,
 } from '@zero/main/crypto';
+import { MASTER_PASSWORD_LENGTH, RECOVERY_MIN_WORDS } from '@zero/shared/policy';
 
 /** Parâmetros mínimos: aqui os testes cuidam da forma, não do custo. */
 const TEST_KDF = { memoryKiB: 16_384, iterations: 1, parallelism: 1 };

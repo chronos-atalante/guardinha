@@ -31,6 +31,7 @@ export const ko: Messages = {
     name: 'Guardinha',
     subtitle: 'Otaku Delirante',
     statusLocal: '100% 로컬 / 암호화됨',
+    statusLabel: '상태:',
     nav: {
       home: '홈 (비밀번호)',
       generator: '비밀번호 생성기',

@@ -31,6 +31,7 @@ export const zhCN: Messages = {
     name: 'Guardinha',
     subtitle: 'Otaku Delirante',
     statusLocal: '100% 本地 / 已加密',
+    statusLabel: '状态:',
     nav: {
       home: '首页（密码）',
       generator: '密码生成器',

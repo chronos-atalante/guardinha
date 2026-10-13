@@ -29,6 +29,7 @@ export const ptBR = {
     name: 'Guardinha',
     subtitle: 'Otaku Delirante',
     statusLocal: '100% Local / Criptografado',
+    statusLabel: 'Status:',
     nav: {
       home: 'Início (Senhas)',
       generator: 'Gerador de Senhas',

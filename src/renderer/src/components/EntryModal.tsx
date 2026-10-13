@@ -3,7 +3,7 @@ import type { JSX } from 'react';
 import { Eye, EyeOff, Trash2, X } from 'lucide-react';
 import { useMessages } from '@zero/renderer/i18n';
 import { StrengthMeter } from '@zero/renderer/components/StrengthMeter';
-import { strengthFor } from '@zero/shared';
+import { errorMessage, strengthFor } from '@zero/shared';
 import type { Credential, CredentialInput } from '@zero/types';
 
 interface EntryModalProps {
@@ -12,10 +12,6 @@ interface EntryModalProps {
   onClose: () => void;
   onChanged: () => Promise<void>;
   onToast: (message: string) => void;
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message !== '' ? error.message : fallback;
 }
 
 export function EntryModal({ entry, onClose, onChanged, onToast }: EntryModalProps): JSX.Element {

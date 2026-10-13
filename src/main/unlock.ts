@@ -3,13 +3,11 @@ import {
   loadAuthState,
   registerFailedAttempt,
   statusFrom,
-  validateMasterPasswordFormat,
-  validatePinFormat,
 } from '@zero/main/auth';
 import { vaultStorage } from '@zero/main/facade';
 import { currentMessages } from '@zero/main/i18n';
 import { keyUnwrapperFor } from '@zero/main/unwrapping';
-import { formatCountdown } from '@zero/shared';
+import { formatCountdown, isMasterPasswordFormat, isPinFormat } from '@zero/shared';
 import type { VaultContainerData } from '@zero/main/container';
 import type { UnlockInput, VaultResult } from '@zero/types';
 
@@ -109,8 +107,7 @@ class ExponentialLockoutHandler extends UnlockHandler {
 class FormatValidatorHandler extends UnlockHandler {
   protected process(context: UnlockContext): HandlerOutcome {
     const { kind, credential } = context.input;
-    const valid =
-      kind === 'pin' ? validatePinFormat(credential) : validateMasterPasswordFormat(credential);
+    const valid = kind === 'pin' ? isPinFormat(credential) : isMasterPasswordFormat(credential);
     if (valid) return null;
     // malformada é credencial errada: mesma resposta de sempre, só mais barata
     return credentialFailure(context);

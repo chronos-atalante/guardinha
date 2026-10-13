@@ -2,16 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { ShieldAlert, SlidersHorizontal } from 'lucide-react';
 import { richText, useMessages } from '@zero/renderer/i18n';
-import { strengthFor } from '@zero/shared';
+import { errorMessage, PIN_LENGTH, strengthFor } from '@zero/shared';
 import { StrengthMeter } from '@zero/renderer/components/StrengthMeter';
 import type { PanicStatus } from '@zero/types';
 
 /** Teto aceito no campo: acima de 999 ninguém sobrevive à própria configuração. */
 const MAX_LIMIT_INPUT = 999;
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message !== '' ? error.message : fallback;
-}
 
 /**
  * Proteções de pânico: PIN de coação e autodestruição por tentativas.
@@ -177,7 +173,7 @@ export function Settings(): JSX.Element {
                 className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 focus:outline-none focus:border-emerald-500/60"
               />
             </div>
-            {pin.length === 8 && (
+            {pin.length === PIN_LENGTH && (
               <StrengthMeter result={strengthFor('pin').evaluate(pin)} hint={m.strength.hintPin} />
             )}
             <button
@@ -185,7 +181,7 @@ export function Settings(): JSX.Element {
               onClick={() => {
                 void handleSetPanic();
               }}
-              disabled={busy || pin.length !== 8}
+              disabled={busy || pin.length !== PIN_LENGTH}
               className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {m.settings.panicSet}

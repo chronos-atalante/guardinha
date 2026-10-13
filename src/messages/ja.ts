@@ -31,6 +31,7 @@ export const ja: Messages = {
     name: 'Guardinha',
     subtitle: 'Otaku Delirante',
     statusLocal: '100% ローカル / 暗号化済み',
+    statusLabel: '状態:',
     nav: {
       home: 'ホーム（パスワード）',
       generator: 'パスワード生成',

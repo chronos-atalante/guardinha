@@ -5,14 +5,10 @@ import { useMessages } from '@zero/renderer/i18n';
 import { copyAndAutoClear } from '@zero/renderer/clipboard';
 import { SensitivitySlider } from '@zero/renderer/components/SensitivitySlider';
 import { StrengthMeter } from '@zero/renderer/components/StrengthMeter';
-import { strengthFor } from '@zero/shared';
+import { errorMessage, strengthFor } from '@zero/shared';
 
 interface GeneratorProps {
   onToast: (message: string) => void;
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message !== '' ? error.message : fallback;
 }
 
 export function Generator({ onToast }: GeneratorProps): JSX.Element {

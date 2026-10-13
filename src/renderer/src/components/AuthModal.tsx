@@ -2,9 +2,16 @@ import { useEffect, useState } from 'react';
 import type { JSX, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { ArrowLeft, Hash, KeyRound, Lock, ShieldCheck, Sparkles } from 'lucide-react';
 import { richText, useMessages } from '@zero/renderer/i18n';
-import { countWords, errorMessage, normalizePhrase } from '@zero/renderer/formatters';
+import { countWords, normalizePhrase } from '@zero/renderer/formatters';
 import { StrengthMeter } from '@zero/renderer/components/StrengthMeter';
-import { formatCountdown, strengthFor } from '@zero/shared';
+import {
+  errorMessage,
+  formatCountdown,
+  isPinFormat,
+  MASTER_PASSWORD_LENGTH,
+  RECOVERY_MIN_WORDS,
+  strengthFor,
+} from '@zero/shared';
 import type { VaultStatus } from '@zero/types';
 
 interface AuthModalProps {
@@ -12,12 +19,6 @@ interface AuthModalProps {
   /** Recarrega o status no App após qualquer operação de cofre. */
   onRefresh: () => Promise<void>;
 }
-
-/**
- * Mínimo de palavras da frase de recuperação (espelha `RECOVERY_MIN_WORDS`
- * de `@zero/main/crypto`; o renderer não importa módulos do main).
- */
-const RECOVERY_MIN_WORDS = 12;
 
 export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
   const m = useMessages();
@@ -66,8 +67,8 @@ export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
 
   const handleCreateCredentials = (): void => {
     setError(null);
-    if (master.length !== 24) {
-      setError(m.auth.masterLength(24, master.length));
+    if (master.length !== MASTER_PASSWORD_LENGTH) {
+      setError(m.auth.masterLength(MASTER_PASSWORD_LENGTH, master.length));
       return;
     }
     if (strengthFor('master').evaluate(master).blocked) {
@@ -78,7 +79,7 @@ export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
       setError(m.auth.masterMismatch);
       return;
     }
-    if (!/^\d{8}$/.test(pin)) {
+    if (!isPinFormat(pin)) {
       setError(m.auth.pinInvalid);
       return;
     }
@@ -156,7 +157,7 @@ export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
       setError(m.auth.recoveryTooShort(RECOVERY_MIN_WORDS, words));
       return;
     }
-    if (!/^\d{8}$/.test(newPin)) {
+    if (!isPinFormat(newPin)) {
       setError(m.auth.pinInvalid);
       return;
     }

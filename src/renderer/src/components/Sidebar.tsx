@@ -97,7 +97,8 @@ export function Sidebar({
       </div>
 
       <div className="text-xs text-slate-500 px-2 text-center border-t border-slate-800 pt-3">
-        Status: <span className="text-emerald-400 font-semibold">{m.app.statusLocal}</span>
+        {m.app.statusLabel}{' '}
+        <span className="text-emerald-400 font-semibold">{m.app.statusLocal}</span>
       </div>
     </aside>
   );

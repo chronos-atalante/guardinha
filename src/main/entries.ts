@@ -3,9 +3,8 @@ import { vaultStorage } from '@zero/main/facade';
 import { requireSessionKey, touch } from '@zero/main/vault';
 import { vaultSession } from '@zero/main/session';
 import { currentMessages } from '@zero/main/i18n';
+import { isUuid } from '@zero/shared';
 import type { Credential, CredentialInput } from '@zero/types';
-
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Todas as credenciais decifradas, da mais recente para a mais antiga.
@@ -40,7 +39,7 @@ export function saveEntry(input: CredentialInput): Credential[] {
   let createdAt = now;
 
   if (input.id !== undefined && input.id !== '') {
-    if (!UUID_PATTERN.test(input.id)) throw new Error(m.errors.invalidId);
+    if (!isUuid(input.id)) throw new Error(m.errors.invalidId);
     if (!vaultStorage.listIds().includes(input.id)) throw new Error(m.errors.entryNotFound);
     // a fachada já responde adulteração quando o arquivo não decifra
     const stored = vaultStorage.readRecord(input.id, key);
@@ -67,7 +66,7 @@ export function saveEntry(input: CredentialInput): Credential[] {
 export function removeEntry(id: string): Credential[] {
   const key = requireSessionKey();
   const m = currentMessages();
-  if (!UUID_PATTERN.test(id)) throw new Error(m.errors.invalidId);
+  if (!isUuid(id)) throw new Error(m.errors.invalidId);
   if (!vaultStorage.listIds().includes(id)) throw new Error(m.errors.entryNotFound);
   vaultStorage.removeRecord(id, key);
   touch();

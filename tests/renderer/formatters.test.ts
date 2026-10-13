@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { countWords, errorMessage, normalizePhrase } from '@zero/renderer/formatters';
+import { countWords, normalizePhrase } from '@zero/renderer/formatters';
 
 /**
  * Utilitários de texto usados por várias telas. `normalizePhrase` precisa
  * concordar com `normalizeRecoveryPhrase` do main: as duas implementações
  * calculam a mesma frase de recuperação e divergir entre elas abriria falha
- * no reset do PIN.
+ * no reset do PIN. `errorMessage` mora em `@zero/shared/format` e é testado
+ * em `tests/shared/format.test.ts`.
  */
 
 describe('countWords', () => {
@@ -41,23 +42,5 @@ describe('normalizePhrase', () => {
 
   it('mantém acentos, que fazem parte da frase do usuário', () => {
     expect(normalizePhrase('  Café  com  Pão  ')).toBe('café com pão');
-  });
-});
-
-describe('errorMessage', () => {
-  it('usa a mensagem do erro quando ela existe', () => {
-    expect(errorMessage(new Error('Cofre bloqueado.'), 'padrão')).toBe('Cofre bloqueado.');
-  });
-
-  it('cai no padrão quando o erro é vazio', () => {
-    expect(errorMessage(new Error(''), 'padrão')).toBe('padrão');
-  });
-
-  it('cai no padrão quando não é Error', () => {
-    // rejeição de IPC chega como string, objeto ou undefined
-    expect(errorMessage('texto solto', 'padrão')).toBe('padrão');
-    expect(errorMessage(undefined, 'padrão')).toBe('padrão');
-    expect(errorMessage(null, 'padrão')).toBe('padrão');
-    expect(errorMessage({ message: 'objeto' }, 'padrão')).toBe('padrão');
   });
 });
