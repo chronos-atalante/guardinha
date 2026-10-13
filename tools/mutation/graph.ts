@@ -112,7 +112,7 @@ function read(file: string): ModuleInfo {
       readVariables(node, info);
       return;
     }
-    if (node.type === 'CallExpression') {
+    if (node.type === 'ImportExpression') {
       readDynamicImport(node, info);
     }
   });
@@ -120,12 +120,21 @@ function read(file: string): ModuleInfo {
   return info;
 }
 
+/**
+ * `import('x')` dinâmico. Desde o Babel 8 isso é um `ImportExpression` com a
+ * `source`; antes era um `CallExpression` com `callee` do tipo `Import`, e o
+ * silenciar de uma forma para a outra tirava o arquivo inteiro do grafo sem
+ * erro nenhum (foi o que aconteceu com `src/preload/index.ts`, que só é
+ * alcançado por `import()`). `tests/tools/mutation-runner.test.ts` trava a
+ * forma para que um Babel maior não repita isso.
+ *
+ * Só o especificador literal é seguido: montado em tempo de execução, ele não
+ * tem caminho estático, e a mesma regra vale para o resto do grafo.
+ */
 function readDynamicImport(node: Node, info: ModuleInfo): void {
-  const self = node as unknown as { callee: Node; arguments: Node[] };
-  if (self.callee.type !== 'Import') return;
-  const first = self.arguments[0];
-  if (first?.type !== 'StringLiteral') return;
-  info.dependencies.push({ specifier: valueOf(first), names: [], whole: true });
+  const self = node as unknown as { source: Node | null };
+  if (self.source?.type !== 'StringLiteral') return;
+  info.dependencies.push({ specifier: valueOf(self.source), names: [], whole: true });
 }
 
 function readImport(node: Node): Dependency {

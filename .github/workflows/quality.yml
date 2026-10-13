@@ -19,8 +19,14 @@ name: Qualidade
 # "Verificar qualidade" como status checks obrigatórios nas regras de proteção
 # da `main` (Settings > Branches > Branch protection rules).
 #
-# Actions fixadas por SHA completo (com a tag na comentário) para não depender
-# da segurança da tag movível; o Dependabot (`github-actions`) atualiza os pins.
+# "Testes de mutação" roda em todo push e pull_request, mas de propósito NÃO é
+# status check obrigatório: a varredura completa leva horas, e segurar o merge
+# por ela castiga todo PR por um número que muda devagar. Ela reprova sozinha
+# abaixo de 65% (piso ajustável pelo disparo manual), então a queda real aparece
+# como build vermelho sem virar trava de branch.
+#
+# Actions fixadas por SHA completo (com a tag na comentário) para não depender de
+# segurança da tag movível; o Dependabot (`github-actions`) atualiza os pins.
 
 on:
   push:
@@ -37,9 +43,9 @@ on:
   workflow_dispatch:
     inputs:
       min_score:
-        description: 'Reprovar se o score de mutação ficar abaixo deste valor (%)'
+        description: 'Piso de reprovação do score de mutação (%). Padrão: 65'
         required: false
-        default: '0'
+        default: '65'
         type: string
       mutation_file:
         description: 'Medir só este arquivo de src/ (repete o passo por vírgula)'
@@ -158,16 +164,25 @@ jobs:
 
   mutacao:
     name: Testes de mutação
-    # Não entra no gate de PR. A varredura completa leva cerca de 90 min na
-    # máquina de quem escreveu (`docs/mutation.md`) e bem mais nos 2 núcleos de
-    # um runner, então colocá-la em todo push deixaria o PR esperando por algo
-    # que só muda quando alguém escreve teste novo. Ela roda na madrugada e por
-    # demanda; o número vai para o resumo da execução e para o artefato.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # Roda em todo push e pull_request, além do agendamento e do disparo manual.
+    # Não é status check obrigatório (as regras de proteção do repositório exigem
+    # só "Verificar qualidade" e "Testes e cobertura"), então a varredura
+    # informa sem segurar o merge: ela leva horas e reprovar um PR inteiro
+    # porque o score caiu duas décimos não serve para ninguém.
     runs-on: ubuntu-24.04
-    # O runner aborta cada mutante sozinho (240 s por padrão, `--timeout`); este
-    # teto é só para o job não ficar pendurado se algo travar fora do plano.
-    timeout-minutes: 360
+    # Grupo próprio, e não o do workflow: lá, todo push cancela a execução
+    # anterior, o que mataria uma varredura de horas no meio sem que ninguém
+    # tenha tocado em nada. Aqui só uma varredura anterior da mesma branch é
+    # cancelada, e ainda assim só por push (pull request nunca é cancelado, para
+    # o status não ficar indefinido enquanto o autor corrige).
+    concurrency:
+      group: mutacao-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'push' }}
+    # O runner aborta cada mutante sozinho (240 s por padrão, `--timeout`).
+    # O teto abaixo é só para o job não ficar pendurado se algo travar fora do
+    # plano, e fica abaixo do limite de 6 h do runner hospedado, com folga para
+    # não morrer exatamente na borda.
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -180,7 +195,13 @@ jobs:
 
       - name: Varredura de mutação
         env:
-          MIN_SCORE: ${{ inputs.min_score || '0' }}
+          # Piso de 65% (o medido hoje é 69,4%). A folga é de propósito: o score
+          # depende da máquina, porque mutante que estoura os 240 s vira `timeout`
+          # e sai do denominador, e o runner do CI tem menos núcleo que a
+          # máquina onde a varredura foi escrita. Um piso colado no número
+          # medido daria build vermelho por causa do runner, não do código.
+          # Quem quiser um teto mais apertado usa o input do disparo manual.
+          MIN_SCORE: ${{ inputs.min_score || '65' }}
           MUTATION_FILE: ${{ inputs.mutation_file }}
         run: |
           set -euo pipefail

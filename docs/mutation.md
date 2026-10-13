@@ -131,20 +131,31 @@ Duas, e as duas importam:
 
 ## No CI
 
-A varredura completa roda no `quality.yml`, no job **Testes de mutação**, mas
-fora do gate de PR: ela leva cerca de 90 min na máquina de quem escreveu e bem
-mais nos 2 núcleos de um runner. Dispara por `schedule` (domingo de madrugada) e
-por `workflow_dispatch`, com dois inputs:
+A varredura roda no `quality.yml`, no job **Testes de mutação**, em todo push e
+pull_request, além do `schedule` (domingo de madrugada) e do `workflow_dispatch`.
+Ela reprova abaixo de **65%**, com o número medido hoje em 69,4%.
 
-| Input           | Efeito                                                               |
-| --------------- | -------------------------------------------------------------------- |
-| `min_score`     | reprova a execução se o score ficar abaixo (padrão `0`, não reprova) |
-| `mutation_file` | mede só esses arquivos de `src/`, separados por vírgula              |
+| Input           | Efeito                                                      |
+| --------------- | ----------------------------------------------------------- |
+| `min_score`     | piso de reprovação (padrão `65`, o que o job usa sem input) |
+| `mutation_file` | mede só esses arquivos de `src/`, separados por vírgula     |
 
-O score vai para o resumo da execução e a lista de sobreviventes para o
-artefato `mutacao-relatorio`. Reprovar por score é opt-in porque o número é
-sensive à máquina e ao que está em medição; comparar com a execução anterior é
-mais útil do que um piso fixo.
+A folga entre o piso e o número medido é de propósito. O score depende da
+máquina: mutante que estoura os 240 s vira `timeout` e sai do denominador, e o
+runner do CI tem menos núcleo que a máquina onde a varredura foi escrita. Um
+piso colado no número medido daria build vermelho por causa do runner, não do
+código.
+
+O job **não é status check obrigatório** (as regras de proteção exigem só
+"Verificar qualidade" e "Testes e cobertura"). Ele informa e reprova sozinho,
+mas não segura o merge: prender todo PR a uma varredura de horas, para punir uma
+queda de duas décimas, não serve para ninguém. Comparar com a execução anterior
+vale mais do que um piso colado.
+
+Ele também tem **grupo de concorrência próprio** (`mutacao-...`), separado do
+`qualidade-...` do workflow. No grupo do workflow, todo push cancela a execução
+anterior, o que mataria uma varredura de horas no meio sem ninguém ter tocado em
+nada.
 
 ## Arquivos
 
@@ -176,31 +187,35 @@ individuais e `report.md` com o resumo e a lista de sobreviventes.
 - O operador `optional-chaining` gera mutante que estoura em `TypeError` quando
   o valor realmente é nulo. A suíte mata, e a mutação está certa, mas é um sinal
   mais fraco que os outros.
-- O grafo de módulos é estático e **não segue `import()` dinâmico**, nem com
-  especificador literal. `tests/main/preload.test.ts` carrega o preload com
-  `await import('@zero/preload/index')` para poder rodar `vi.resetModules()`, e
-  isso tira `src/preload/index.ts` do grafo inteiro: ele não aparece no plano e
-  **não é medido**. É a ponte entre a interface e o main, então a lacuna não é
-  pequena. Hoje é o único caso assim, mas o grafo deveria aceitar `import()` de
-  especificador literal antes que isso mude.
+- O grafo de módulos é estático e segue `import()` só quando o especificador é
+  literal (montado em tempo de execução, não há caminho estático). Cuidado com
+  esse trecho: ele já esteve quebrado sem dar erro. `tests/main/preload.test.ts`
+  alcança o preload por `await import('@zero/preload/index')`, e quando o Babel 8
+  passou a emitir `ImportExpression` no lugar de `CallExpression` com `callee` do
+  tipo `Import`, `src/preload/index.ts` saiu do grafo inteiro e deixou de ser
+  medido, e a varredura seguiu como se estivesse tudo bem. Um motor que compara
+  **nome de nó** falha em silêncio quando o nome muda, então
+  `tests/tools/mutation-runner.test.ts` fixa os nomes de que o motor depende.
 
 ## Números da varredura
 
 Medidos em `src/` inteiro depois da correção do `fsModuleCache` (ver a garantia
-em "O mutante precisa entrar na execução"): 2.530 mutantes em 820 testes. No
-denominador ficaram 2.293: 1.583 mortos e 710 sobreviventes. Ficaram fora 143
+em "O mutante precisa entrar na execução"): 2.557 mutantes em 820 testes. No
+denominador ficaram 2.320: 1.609 mortos e 711 sobreviventes. Ficaram fora 143
 `timeout` e 94 `compileError`, que não são veredito da suíte.
 
 | Área                    | Score | Mortos | Sobreviv. | Observação                                    |
 | ----------------------- | ----- | ------ | --------- | --------------------------------------------- |
 | `src/messages/index.ts` | 100%  | 1      | 0         | o registro de idiomas                         |
+| `src/preload/index.ts`  | 96,3% | 26     | 1         | a ponte da interface; o resto é equivalente   |
 | `src/main/*`            | 89,6% | 941    | 109       | o núcleo de segurança                         |
 | `src/shared/*`          | 69,8% | 217    | 94        | `otpauth` 86%, `strength` 56%                 |
-| `src/renderer/*`        | 45,6% | 425    | 507       | a tela é verificada por fluxo, não por estado |
+| `src/renderer/*`        | 45,5% | 424    | 507       | a tela é verificada por fluxo, não por estado |
 
-**69,0%** no geral depois da primeira leva de testes novos (era 67,8% na leitura
+**69,4%** no geral depois da primeira leva de testes novos (era 67,8% na leitura
 bruta). O que rendeu: `src/main/shred.ts` foi de 43% para 95%, e `clipboard.ts`,
-`activity.ts` e `format.ts` chegaram a 100%. O padrão que matou mais foi contar
+`activity.ts` e `format.ts` chegaram a 100%. `src/preload/index.ts` voltou a ser
+medido depois do conserto do grafo, e os 27 mutantes dele entram neste total. O padrão que matou mais foi contar
 coisas em vez de só conferir o resultado: o número de passadas da sobrescrita, o
 tamanho e a posição de cada escrita, e se `clearTimeout` foi chamado com um
 temporizador de verdade. O que sobrou em `shred.ts` são mutantes equivalentes de

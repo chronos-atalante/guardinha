@@ -160,8 +160,10 @@ Camadas:
 - `npm test` (ou `test:coverage`): Vitest em `tests/**`.
 - `npm run test:mutation` (ou `test:mutation:plan`): teste de mutação em
   `tools/mutation/`; ver `docs/mutation.md`. É lento (cerca de 90 min) e não
-  entra no `check`. No CI é o job "Testes de mutação" do `quality.yml`, fora do
-  gate de PR (roda por `schedule` e `workflow_dispatch`).
+  entra no `check`. No CI é o job "Testes de mutação" do `quality.yml`, que roda
+  em todo push e pull_request e reprova abaixo de 65%; não é status check
+  obrigatório, porque segurar o merge por uma varredura de horas castiga todo PR
+  por um número que muda devagar.
 - `npm run dev` / `build` / `dist`: desenvolvimento, build, `.deb`.
 - `python3 build/make-icon.py`: regenera `build/icon.png` (PIL); é o `icon`
   do electron-builder e da janela.
