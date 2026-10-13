@@ -12,7 +12,7 @@ têm timeout de 120 s.
 ```bash
 npm test                  # execução única (o que o CI espera)
 npm run test:watch        # modo watch
-npm run test:coverage     # cobertura em coverage/ (limiar de 90%)
+npm run test:coverage     # cobertura em coverage/ (limiar de 95%)
 npm run test:mutation     # teste de mutação (ver docs/mutation.md)
 npm run test:mutation:plan  # só o plano da varredura, sem executar
 ```
@@ -118,9 +118,16 @@ suíte perceberia se ela fizesse outra coisa. O runner é próprio
 ## Cobertura
 
 `vitest.config.mts` mede `src/**/*.{ts,tsx}` com o provedor v8, relatório em
-texto e HTML, e limiar de **90%** para linhas, comandos, funções e ramos. Abaixo
+texto e HTML, e limiar de **95%** para linhas, comandos, funções e ramos. Abaixo
 disso o `npm run test:coverage` reprova, e o job "Testes e cobertura" do
 workflow `quality.yml` fica vermelho junto.
+
+O limiar subiu de 90% para 95% depois da varredura de mutação (`docs/mutation.md`):
+ela mostrou que os ramos que faltavam eram os de decisão, isto é, cofre
+ausente, arquivo fechado e falha de I/O, que é justamente onde um teste que
+só passa pelo caminho feliz não chega. O que sobrou fora são ramos que não têm
+como ser tomados, como o `?? ''` que vem depois de um `Math.min` que já
+limitou o índice da tabela.
 
 Ficam de fora do denominador, com justificativa no próprio config:
 

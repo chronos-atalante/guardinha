@@ -309,3 +309,25 @@ describe('Home: ações', () => {
     expect(onToast).toHaveBeenCalledWith('Domínio inválido.');
   });
 });
+
+describe('Home com falha ao carregar', () => {
+  it('mostra o erro e não o estado vazio', async () => {
+    // A lista vazia e a lista que não carregou são telas diferentes: a segunda
+    // tem de dizer o que houve, senão o usuário conclui que o cofre está vazio
+    // quando na verdade o app não conseguiu ler.
+    const api = installApi();
+    api.entries.list = vi.fn(() => Promise.reject(new Error('falha de leitura')));
+
+    render(
+      <MessagesProvider language="pt-BR">
+        <Home onToast={vi.fn()} />
+      </MessagesProvider>,
+    );
+
+    await waitFor(() => {
+      expect(api.entries.list).toHaveBeenCalled();
+    });
+    await screen.findByText(/falha de leitura/i);
+    expect(screen.queryByText(/nenhuma credencial/i)).not.toBeInTheDocument();
+  });
+});

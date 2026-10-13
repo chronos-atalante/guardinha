@@ -55,11 +55,18 @@ export default defineConfig({
         // o número deitar um teste que existe e passa.
         'src/node.loader.ts',
       ],
+      // Meta de 95% nos quatro. Subiu de 90% depois da varredura de mutação:
+      // ela apontou que os ramos que faltavam eram justamente os de decisão
+      // (cofre ausente, arquivo fechado, falha de I/O), e fechar esses buracos
+      // é o que transforma a cobertura em afirmação. O que sobra são ramos
+      // inalcançáveis por construção, como o `?? ''` depois de um `Math.min`
+      // que já prendeu o índice numa tabela de 5 entradas, e um piso de 100%
+      // só pediria teste impossível.
       thresholds: {
-        lines: 90,
-        statements: 90,
-        functions: 90,
-        branches: 90,
+        lines: 95,
+        statements: 95,
+        functions: 95,
+        branches: 95,
       },
     },
   },

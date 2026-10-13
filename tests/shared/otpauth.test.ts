@@ -177,3 +177,52 @@ describe('buildOtpAuthUri', () => {
     expect(uri.indexOf(STRONG_SECRET)).toBeGreaterThan(uri.indexOf('?'));
   });
 });
+
+describe('cantos do rótulo e dos parâmetros', () => {
+  const base = (extra: string): string => `otpauth://totp/Conta?secret=${STRONG_SECRET}${extra}`;
+
+  it('rótulo sem separador vira conta inteira e emissor vazio', () => {
+    // `otpauth://totp/so-a-conta` é aceito pela wiki. Sem o `:` não há emissor
+    // no rótulo, e é o parâmetro `issuer` que decide se ele existe.
+    const token = parseOtpAuthUri(base(''));
+
+    expect(token).toMatchObject({ account: 'Conta', issuer: '' });
+  });
+
+  it('rótulo com %3A separa no lugar certo, antes de decodificar', () => {
+    // Se o corte viesse depois do `decodeURIComponent`, o `%3A` viraria `:` e
+    // partiria o rótulo no meio de um nome que continha a sequência.
+    const token = parseOtpAuthUri(`otpauth://totp/Acme%3ACorp%3Aconta?secret=${STRONG_SECRET}`);
+
+    expect(token).toMatchObject({ issuer: 'Acme', account: 'Corp:conta' });
+  });
+
+  it('dígitos fora de 1 a 9 recusam a URI em vez de adivinhar', () => {
+    // `0` ainda casa com `\d{1,9}`, então o que recusa é o tamanho. Um serviço
+    // não devolve 10 dígitos, e aceitar o valor abriria mão do código que o
+    // serviço espera.
+    for (const digitos of ['1234567890', '12345678901234567890']) {
+      expect(parseOtpAuthUri(base(`&digits=${digitos}`))).toBeNull();
+    }
+  });
+
+  it('período e dígitos ausentes assumem o padrão do serviço', () => {
+    const token = parseOtpAuthUri(base(''));
+
+    expect(token).toMatchObject({ digits: 6, period: 30, algorithm: 'SHA1' });
+  });
+
+  it('token sem emissor não escreve parâmetro issuer na URI', () => {
+    const uri = buildOtpAuthUri({
+      issuer: '',
+      account: 'alice@github.com',
+      secret: STRONG_SECRET,
+      algorithm: 'SHA1',
+      digits: 6,
+      period: 30,
+    });
+
+    expect(uri.startsWith('otpauth://totp/alice@github.com?')).toBe(true);
+    expect(uri).not.toContain('issuer=');
+  });
+});

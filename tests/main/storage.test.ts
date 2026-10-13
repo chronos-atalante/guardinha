@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { packEntryPayload, packVaultContainer, sealManifest } from '@zero/main/container';
+import { clearDestroyedFlag, markVaultDestroyed } from '@zero/main/erasure-state';
 import { currentMessages } from '@zero/main/i18n';
 import { containerFile } from '@zero/main/layout';
 import {
@@ -192,5 +193,62 @@ describe('erros de payload e manifesto adulterados', () => {
     expect(() => verifyManifest(Buffer.alloc(32, 2))).toThrow(
       currentMessages().errors.vaultTampered,
     );
+  });
+});
+
+describe('a varredura ignora o que não é credencial', () => {
+  it('arquivo estranho em .entries/ não vira id na lista', () => {
+    // `listEntryIds` filtra pelo sufixo. Sem o filtro, o `.tmp` de uma escrita
+    // em curso apareceria como credencial na lista da interface.
+    const entries = path.join(targetVaultDir(), '.entries');
+    fs.writeFileSync(path.join(entries, 'escrito-vez.zke.tmp'), 'meio de escrita');
+    fs.writeFileSync(path.join(entries, 'notas.txt'), 'anotacao');
+
+    const ids = listEntryIds();
+
+    expect(ids).toContain(ENTRY_ID);
+    expect(ids).not.toContain('escrito-vez.zke');
+    expect(ids).not.toContain('notas');
+  });
+
+  it('id bem formado cujo arquivo sumiu dá erro de credencial inexistente', () => {
+    // O id passa pela validação de forma e só esbarra na ausência do arquivo.
+    expect(() => readEntryPayload('0f0f0f0f-0000-4000-8000-000000000000')).toThrow(
+      currentMessages().errors.entryNotFound,
+    );
+  });
+
+  it('escrever depois de um Cryptographic Erase não ressuscita o container', () => {
+    // A guarda de `writeVaultContainer`: com o cofre marcado como destruído, a
+    // escrita sai sem tocar o disco. Sem ela, um read-modify-write com a chave
+    // ainda em memória criaria um `vault.zkv` pela metade e o cofre destruído
+    // voltaria a parecer "adulterado" em vez de "inexistente".
+    const data = readVaultContainer();
+    if (data === null) throw new Error('container de teste ausente');
+    const antes = fs.readFileSync(containerFile());
+
+    markVaultDestroyed();
+    try {
+      writeVaultContainer(data);
+
+      expect(fs.readFileSync(containerFile()).equals(antes)).toBe(true);
+    } finally {
+      clearDestroyedFlag();
+    }
+  });
+});
+
+describe('verifyManifest com o arquivo fora do esperado', () => {
+  it('sem container, diz que o cofre não existe', () => {
+    const arquivo = containerFile();
+    const backup = fs.readFileSync(arquivo);
+    fs.rmSync(arquivo, { force: true });
+    try {
+      expect(() => verifyManifest(Buffer.alloc(32, 7))).toThrow(
+        currentMessages().errors.vaultMissing,
+      );
+    } finally {
+      fs.writeFileSync(arquivo, backup);
+    }
   });
 });

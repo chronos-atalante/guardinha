@@ -4,6 +4,56 @@ Todos os lançamentos seguem [versionamento semântico](https://semver.org/lang/
 (`MAJOR.MINOR.PATCH`) e o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 em português do Brasil.
 
+## [1.6.2] - 2026-10-13
+
+### Corrigido
+
+- **A cadeia de desbloqueio não parava no corte da autodestruição.** Quando a
+  senha mestra cruzava o limite estrito, a cadeia devolvia "passe adiante" em
+  vez de "pare", então o Argon2id rodava mesmo assim e a tentativa era contada
+  duas vezes. Isso encurtava um degrau da trava exponencial por erro do usuário.
+- **A credencial copiada não sumia do clipboard ao encerrar o app.** O
+  temporizador de limpeza morre junto com o processo, então sair do aplicativo
+  deixava a senha no clipboard do sistema indefinidamente. A limpeza agora
+  acontece na hora tanto na destruição do cofre quanto na saída.
+- **O `resetPin` podia deixar a chave de trabalho na memória.** Se o
+  desembrulho da frase falhasse, o `Buffer` derivado não era zerado. Agora a
+  limpeza está no `finally`.
+- **O `fs` saiu do arquivo de janela e IPC para módulos próprios**, e a regra de
+  fronteira passou a ser conferida pelo lint: ele recusa `fs` fora da lista de
+  módulos autorizados e recusa `fs` e `child_process` no renderer e no preload.
+- **Testes que mediam o mutante errado.** O cache de módulos transformados do
+  Vitest revalidava o texto do mutante anterior, então, a partir do segundo
+  mutante de cada arquivo, a suíte rodava contra o código errado e o veredito
+  saía "sobreviveu" sem ter sido medido. O placar de mutação de um arquivo
+  caía sozinho conforme a varredura avançava.
+
+### Adicionado
+
+- **Testes de mutação no repositório e medição contínua.** A varredura é uma
+  ferramenta de desenvolvimento que roda por push na `developer`, uma vez por
+  mês e por disparo manual, com o score no resumo da execução. Também é usada
+  aqui para achar buraco de teste: foi ela que mostrou que a fronteira de
+  origem do IPC não notificava a perda de sessão e que a varredura de
+  temporários não contava o arquivo que sobrou depois da sobrescrita.
+- **Medição de performance dos testes de interface.** O teto padrão de espera
+  do Testing Library passou a ser 15 s, calibrado para uma suíte em que os
+  testes do processo principal derivam chaves com Argon2id de produção.
+
+### Alterado
+
+- **Meta de cobertura de 90% para 95%** em linhas, comandos, funções e ramos.
+  A varredura de mutação mostrou que os ramos que faltavam eram os de decisão
+  (cofre ausente, arquivo fechado, falha de I/O), e fechar esses buracos é o
+  que transforma a cobertura em afirmação.
+- **Dependências atualizadas**, incluindo o Babel na versão 8. Isso expôs que o
+  `import()` dinâmico passou a ser lido como outro tipo de nó, o que tirava o
+  arquivo do preload da varredura de mutação sem gerar erro; agora há teste
+  que fixa a forma da árvore sintática de que o motor depende.
+- **Documentação alinhada com o código:** `container.ts`, `logging.ts` e o gerador
+  de senha deixaram de ser módulos não documentados, e os rótulos de padrão de
+  projeto foram corrigidos onde nomeavam algo que o código não faz.
+
 ## [1.6.1] - 2026-10-11
 
 ### Adicionado

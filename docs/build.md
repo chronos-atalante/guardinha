@@ -170,7 +170,7 @@ para o Dependabot: foi por isso que o `ubuntu-latest` precisou ser fixado à mã
 `.github/workflows/quality.yml` confere a `developer` enquanto o código está
 sendo escrito, que é o oposto do `publish.yml` (que só roda na `main`, no
 momento em que a versão sai). Sem ele, erro de tipo, formatação quebrada,
-dependência vulnerável, teste vermelho ou cobertura abaixo de 90% só apareceriam
+dependência vulnerável, teste vermelho ou cobertura abaixo de 95% só apareceriam
 depois do merge.
 
 | Gatilho                    | O que roda                                            |
@@ -184,7 +184,7 @@ Dois jobs independentes, para a falha apontar o culpado:
 - **Verificar qualidade**: `npm run check` (tipos, lint, formato, auditoria OSV,
   shellcheck). Instala `bin/osv-scanner` e `bin/shellcheck` do mesmo jeito que o
   `publish.yml`, com as mesmas versões fixadas.
-- **Testes e cobertura**: `npm run test:coverage`, cujo limiar de 90% mora em
+- **Testes e cobertura**: `npm run test:coverage`, cujo limiar de 95% mora em
   `vitest.config.mts`. Publica a tabela no resumo da execução e sobe o relatório
   HTML como artefato (`cobertura-relatorio`, 14 dias), que é o que serve para
   achar a linha que derrubou o número.

@@ -386,6 +386,23 @@ describe('leitura fail-closed de buffer truncado', () => {
     expect(unpackEntryPayload(Buffer.alloc(3))).toBeNull();
   });
 
+  it('recusa em qualquer corte, e não só nos tamanhos redondos', () => {
+    // Cortar em frações bonitas passa por fora da guarda que importa. O que
+    // fecha o `readBlob` é o tamanho **declarado** do texto ser maior que o que
+    // sobrou, e isso só acontece num corte qualquer, entre o fim do cabeçalho e
+    // o fim do texto. Varrer todos os cortes pega essa janela; as frações não.
+    const payload = encryptRecord({ title: 'GitHub' }, randomBytes(32));
+    const packed = packEntryPayload(payload);
+    for (let cut = 1; cut < packed.length; cut++) {
+      expect(unpackEntryPayload(packed.subarray(0, cut))).toBeNull();
+    }
+
+    const container = packVaultContainer(sampleContainer());
+    for (let cut = 1; cut < container.length; cut++) {
+      expect(damaged(container.subarray(0, cut)).ok).toBe(false);
+    }
+  });
+
   it('recusa flag desconhecida no cabeçalho', () => {
     const packed = packVaultContainer(sampleContainer());
     packed[32] = 0xff;
