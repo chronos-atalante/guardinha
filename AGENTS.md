@@ -127,7 +127,8 @@ Camadas:
   `src/node.loader.ts`; mudar um alias vale nos quatro.
 - Arquivos no teto de ~500 linhas; passou disso, extraia módulos.
 - `fs` no main fica em `storage.ts` (`vault.zkv`), `entries-store.ts` (`.zke`),
-  `auth-store.ts` (`.zka`), `structure.ts` (pastas), `settings.ts`
+  `auth-store.ts` (`.zka`), `structure.ts` (pastas e a escrita atômica
+  `writeSecretFile`, que os quatro Bridgeto usam), `settings.ts`
   (preferências não sensíveis em `settings.json`), `shred.ts`, `erase.ts`
   (a checagem do que sobrou) e `protocol.ts` (o servidor de assets do scheme).
   `shred.ts` é uma primitiva de baixo nível: recebe um caminho validado por

@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import path from 'node:path';
 import os from 'node:os';
 import { LANGUAGES } from '@zero/messages';
+import { writeSecretFile } from '@zero/main/structure';
 import type { AppSettings, Language } from '@zero/types';
 
 /** Configurações não sensíveis em XDG ($XDG_CONFIG_HOME/guardinha/). */
@@ -36,8 +37,6 @@ export function saveSettings(settings: AppSettings): AppSettings {
   const normalized: AppSettings = { language: normalizeLanguage(settings.language) };
   fs.ensureDirSync(configDir(), { mode: 0o700 });
   fs.chmodSync(configDir(), 0o700);
-  const tmp = `${settingsFile()}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(normalized, null, 2), { mode: 0o600 });
-  fs.renameSync(tmp, settingsFile());
+  writeSecretFile(settingsFile(), JSON.stringify(normalized, null, 2));
   return normalized;
 }

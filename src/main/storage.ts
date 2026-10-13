@@ -8,7 +8,7 @@ import {
 import { currentMessages } from '@zero/main/i18n';
 import { containerFile } from '@zero/main/layout';
 import { isVaultDestroyed } from '@zero/main/erasure-state';
-import { ensureVaultStructure } from '@zero/main/structure';
+import { ensureVaultStructure, writeSecretFile } from '@zero/main/structure';
 import { listAuthIds } from '@zero/main/auth-store';
 import { listEntryIds } from '@zero/main/entries-store';
 import type { ManifestContent, VaultContainerData } from '@zero/main/container';
@@ -80,11 +80,7 @@ export function writeVaultContainer(data: VaultContainerData): void {
   // libera de novo, e só porque o usuário pediu um cofre novo.
   if (isVaultDestroyed()) return;
   ensureVaultStructure();
-  const buffer = packVaultContainer(data);
-  const tmp = `${containerFile()}.tmp`;
-  fs.writeFileSync(tmp, buffer, { mode: 0o600 });
-  fs.renameSync(tmp, containerFile());
-  fs.chmodSync(containerFile(), 0o600);
+  writeSecretFile(containerFile(), packVaultContainer(data));
 }
 
 // ---------- Estado da trava exponencial (dentro do container) ----------

@@ -65,7 +65,7 @@ O acesso ao disco é concentrado, e a divisão é por domínio, não por arquivo
 | Arquivo                     | O que ele toca                                           |
 | --------------------------- | -------------------------------------------------------- |
 | `src/main/layout.ts`        | Nada: só resolve caminhos, sem `fs` e sem Electron       |
-| `src/main/structure.ts`     | Pastas do cofre e permissões                             |
+| `src/main/structure.ts`     | Pastas, permissões e a escrita atômica em 0600           |
 | `src/main/storage.ts`       | O `vault.zkv`; aceita somente o formato v5               |
 | `src/main/entries-store.ts` | Os arquivos `.zke` de cada credencial                    |
 | `src/main/auth-store.ts`    | Os arquivos `.zka` de cada token de 2FA                  |

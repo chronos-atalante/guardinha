@@ -53,7 +53,7 @@ entrypoints que o Electron exige) e arquivo no teto de ~500 linhas é quebrado.
 | `crypto.ts`        | Argon2id, AES-256-GCM e HKDF (por domínio) do cofre                                |
 | `generator.ts`     | Gerador de senha de alta entropia (não tem relação com a chave do cofre)           |
 | `layout.ts`        | Onde o cofre mora: resolve caminhos, sem `fs` e sem Electron                       |
-| `structure.ts`     | Pastas do cofre e permissões                                                       |
+| `structure.ts`     | Pastas do cofre, permissões e a escrita atômica `writeSecretFile`                  |
 | `storage.ts`       | Leitura e escrita do `vault.zkv`, chamada pela fachada                             |
 | `entries-store.ts` | Os arquivos `.zke` de cada credencial                                              |
 | `auth-store.ts`    | Os arquivos `.zka` de cada token de 2FA, um por token                              |
