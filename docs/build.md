@@ -166,7 +166,8 @@ Sobre o Dependabot: ele **não** é o que segura nada aqui. Os workflows fixam a
 actions por SHA completo, e o Dependabot (`github-actions`) só abre PR para
 mover esses pins. Se ninguém mesclar esses PRs, nada quebra: os pins atuais
 (`checkout` v7.0.1, `setup-node` v7.0.0, `codeql-action` v4.38.2,
-`upload-artifact` v7.0.2) seguem funcionando. O que para de acontecer é a
+`upload-artifact` v7.0.2, `github-script` v9.0.0) seguem funcionando. O que
+para de acontecer é a
 chegada automática de correção de segurança das actions, e isso é revisão de
 ponta, não automação. Já a migração do runner é mudança da **imagem**, invisível
 para o Dependabot: foi por isso que o `ubuntu-latest` precisou ser fixado à mão.
@@ -215,3 +216,61 @@ ninguém é obrigado a esperar.
 | `codeql.yml`     | CodeQL em push/PR para `main` e semanalmente                 |
 | `agradecer.yml`  | Comentário de agradecimento ao mesclar um PR                 |
 | `dependabot.yml` | PRs semanais para dependências npm e actions                 |
+
+## `pull_request_target` e a política de Ações
+
+O `agradecer.yml` é o único workflow em `pull_request_target`, e ele precisa
+desse evento: no `pull_request` o `GITHUB_TOKEN` de um PR que veio de fork é
+somente leitura, então o comentário de agradecimento voltaria 403. O evento é
+seguro aqui porque o workflow não faz checkout, não executa nada do fork e só
+chama `issues.createComment` (o guia do GitHub está em
+[securing pull_request_target](https://docs.github.com/en/actions/reference/security/secure-use#hardening-for-untrusted-pull-requests)).
+
+Em **02/11/2026** o GitHub passa a **bloquear** `pull_request_target` por
+padrão em repositório público, e o `guardinha` é público. A partir dessa data, o
+`agradecer` deixa de rodar sem uma configuração do próprio repositório. Como o
+workflow é legítimo e o CONTRIBUTING espera PR de fora, a saída é uma política
+de Ações que permita o evento, e só ele:
+
+```bash
+gh auth login # token com escopo de escrita em Actions e administração do repositório
+gh api --method POST repos/chronos-atalante/guardinha/actions/policies \
+  --input - <<'JSON'
+{
+  "name": "Permitir pull_request_target no agradecer",
+  "enforcement": "active",
+  "conditions": {
+    "workflow_path": {
+      "include": [".github/workflows/agradecer.yml"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "restrict_action_events",
+      "parameters": {
+        "allowed_events": ["pull_request_target"]
+      }
+    }
+  ]
+}
+JSON
+```
+
+Pontos que importam:
+
+- **`enforcement: active`.** O `evaluate` (que só avisa, sem bloquear) existe
+  apenas no GitHub Enterprise. Para o resto, é `active` ou nada.
+- **`workflow_path` é o que segura o escopo.** A política vale só para o
+  `agradecer.yml`; nenhum outro workflow ganha `pull_request_target`.
+- **Não é preciso `~ALL`.** A condição sem `workflow_path` vale para todos os
+  workflows do repositório, e o que o GitHub pede aqui é justamente o
+  contrário: uma exceção estreita e auditável.
+- **Conferindo depois:** `gh api repos/chronos-atalante/guardinha/actions/policies`
+  (com `--jq '.policies[] | {name, enforcement}'`) e a aba **Settings > Actions >
+  Policies** do repositório, que é onde a regra fica visível para quem lê o
+  repositório sem ser o dono.
+
+A alternativa seria trocar o gatilho para `pull_request` e aceitar que o
+agradecimento não acontece em PR de fork. Como o objetivo do workflow é
+justamente agradecer a quem contribuiu de fora, a política é o caminho certo.
