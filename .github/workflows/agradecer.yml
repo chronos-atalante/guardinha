@@ -27,6 +27,8 @@ jobs:
       - name: Comentar agradecimento
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
+          node-version: 24
+          ref: ${{ github.event.pull_request.head.sha }}
           script: |
             const pr = context.payload.pull_request;
             const body = [
