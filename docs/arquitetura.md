@@ -123,7 +123,8 @@ Guardinha/
 │   ├── messages/     textos pt-BR, zh-CN, ko, ja e en
 │   ├── shared/       regras puras compartilhadas
 │   └── types/        contratos compartilhados
-├── tests/            main/, renderer/, messages/, shared/ e mocks/
+├── tests/            main/, renderer/, shared/, messages/, tools/ e mocks/
+├── tools/            runner da varredura de mutação (mutation.md)
 ├── AGENTS.md         regras duras do repositório
 ├── CONTRIBUTING.md   fluxo de contribuição e lançamentos
 └── SECURITY.md       proteções, riscos aceitos e canal de reporte

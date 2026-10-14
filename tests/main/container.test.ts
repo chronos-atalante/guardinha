@@ -212,7 +212,7 @@ describe('container do cofre (vault.zkv)', () => {
       ...pin,
       kdf: { algo: 'argon2id', memoryKiB: 1, iterations: 1, parallelism: 1 },
     } satisfies WrappedMethod;
-    expect(() => packVaultContainer(data)).toThrow('parâmetros KDF inválidos');
+    expect(() => packVaultContainer(data)).toThrow('Parâmetros de KDF inválidos.');
   });
 
   it('recusa mágica inválida, versão desconhecida e lixo no fim', () => {
@@ -530,13 +530,13 @@ describe('recusa do manifesto pela mensagem', () => {
     const key = randomBytes(32);
 
     expect(() => openManifest(key, encryptRecord({ v: 2, ids: [1], authIds: [] }, key))).toThrow(
-      'manifesto inválido',
+      'Manifesto de integridade inválido.',
     );
     expect(() => openManifest(key, encryptRecord({ v: 1, ids: IDS, authIds: [] }, key))).toThrow(
-      'manifesto inválido',
+      'Manifesto de integridade inválido.',
     );
     expect(() => openManifest(key, encryptRecord({ v: 2, ids: IDS, authIds: [1] }, key))).toThrow(
-      'manifesto inválido',
+      'Manifesto de integridade inválido.',
     );
   });
 
@@ -554,6 +554,6 @@ describe('recusa do manifesto pela mensagem', () => {
     // os arquivos que a versão de hoje gravou.
     const key = randomBytes(32);
     const future = encryptRecord({ v: 3, ids: IDS, authIds: [] }, key);
-    expect(() => openManifest(key, future)).toThrow('manifesto inválido');
+    expect(() => openManifest(key, future)).toThrow('Manifesto de integridade inválido.');
   });
 });

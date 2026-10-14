@@ -7,6 +7,7 @@ import {
   randomBytes,
 } from '@zero/main/crypto';
 import type { VaultKdfParams, WrappedMethod } from '@zero/main/container';
+import { currentMessages } from '@zero/main/i18n';
 import type { UnlockKind } from '@zero/types';
 
 /** Todo método que embrulha a chave, inclusive a frase e o PIN de coação. */
@@ -47,7 +48,7 @@ function kdfFor(kind: CredentialKind): VaultKdfParams {
 /** A chave desembrulhada tem 32 bytes; qualquer outra forma é container corrompido. */
 function asVaultKey(unwrapped: object): Buffer {
   if (!('key' in unwrapped) || typeof unwrapped.key !== 'string' || unwrapped.key.length !== 64) {
-    throw new Error('container corrompido');
+    throw new Error(currentMessages().errors.containerCorrupted);
   }
   return Buffer.from(unwrapped.key, 'hex');
 }
@@ -109,7 +110,7 @@ const UNWRAPPERS: ReadonlyMap<CredentialKind, KeyUnwrapper> = new Map<Credential
 export function keyUnwrapperFor(kind: CredentialKind): KeyUnwrapper {
   const found = UNWRAPPERS.get(kind);
   if (found === undefined) {
-    throw new Error(`método de desbloqueio desconhecido: ${kind}`);
+    throw new Error(currentMessages().errors.unknownUnlockMethod(kind));
   }
   return found;
 }

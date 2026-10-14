@@ -165,12 +165,14 @@ describe('o servidor de assets', () => {
 
   it('o 404 diz o que aconteceu, e não devolve corpo vazio', async () => {
     // O corpo do 404 é o que aparece no DevTools e no log do Chromium quando o
-    // bundle não foi montado. Sem texto, a falha some e só sobra o status.
+    // bundle não foi montado. Sem texto, a falha some e só sobra o status. A
+    // frase é de status do protocolo, em inglês e literal: quem lê é o
+    // carregador de asset, não a interface, então ela não vem do bundle.
     existeSync.mockReturnValue(false);
     const resposta = pedir('/assets/faltando.js');
 
     expect(resposta.status).toBe(404);
-    expect(await resposta.text()).toBe('Não encontrado.');
+    expect(await resposta.text()).toBe('Not Found');
   });
 
   it('devolve 500 quando a leitura estoura, sem derrubar o protocolo', async () => {
@@ -179,7 +181,7 @@ describe('o servidor de assets', () => {
     });
     const resposta = pedir('/assets/app.js');
     expect(resposta.status).toBe(500);
-    expect(await resposta.text()).toBe('Erro');
+    expect(await resposta.text()).toBe('Internal Error');
   });
 });
 

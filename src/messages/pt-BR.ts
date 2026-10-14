@@ -328,6 +328,17 @@ export const ptBR = {
       'A chave precisa ser Base32 válido (A-Z e 2-7) e ter pelo menos 128 bits (16 bytes).',
     authTokenNotFound: 'Token de 2FA não encontrado.',
     internal: 'Erro interno do cofre.',
+    /** Guarda de origem do IPC: o emissor não é a página oficial do app. */
+    foreignFrame: 'IPC bloqueado: a requisição não veio da página do app.',
+    // Invariantes internas: o contrato do código sendo violado. O caminho normal
+    // converte tudo em `vaultTampered` ou `wrongPin` antes de chegar à tela, mas
+    // o texto mora aqui como todo erro emitido pelo processo main.
+    containerCorrupted: 'Registro do cofre corrompido.',
+    invalidManifest: 'Manifesto de integridade inválido.',
+    invalidKdfParams: 'Parâmetros de KDF inválidos.',
+    unknownUnlockMethod: (kind: string): string => `Método de desbloqueio desconhecido: ${kind}`,
+    truncatedDigest: 'Digest HMAC truncado.',
+    shortPhrase: 'Frase de recuperação curta.',
   },
 };
 

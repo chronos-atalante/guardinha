@@ -1,4 +1,5 @@
 import { decryptRecord, encryptRecord, isValidKdfParams } from '@zero/main/crypto';
+import { currentMessages } from '@zero/main/i18n';
 import type { Argon2Params, SaltedPayload } from '@zero/main/crypto';
 
 /**
@@ -7,7 +8,7 @@ import type { Argon2Params, SaltedPayload } from '@zero/main/crypto';
  * - `vault.zkv` (magic `ZKVAULT1`): contagem da trava exponencial + blobs de
  *   chave embrulhados (cada um com o custo de Argon2id do seu método) + o
  *   limite de autodestruição + manifesto cifrado.
- * - `entries/<uuid>.zke` (magic `ZENTRY01`): salt | IV | tag | texto cifrado.
+ * - `.entries/<uuid>.zke` (magic `ZENTRY01`): salt | IV | tag | texto cifrado.
  *
  * Toda leitura é fail-closed: forma inválida, truncamento, parâmetro KDF fora
  * da faixa ou byte adulterado devolvem `null` (ou lançam), nunca conteúdo em
@@ -120,7 +121,7 @@ function methodBlobBytes(method: WrappedMethod): number {
 }
 
 function assertKdf(value: VaultKdfParams): void {
-  if (!isValidKdfParams(value)) throw new Error('parâmetros KDF inválidos');
+  if (!isValidKdfParams(value)) throw new Error(currentMessages().errors.invalidKdfParams);
 }
 
 function writeBlob(buffer: Buffer, offset: number, payload: SaltedPayload): number {
@@ -349,11 +350,12 @@ export function sealManifest(vaultKey: Buffer, ids: string[], authIds: string[])
  * app saber gerar 2FA, então não há `.auth` que o manifesto precise cobrir.
  */
 export function openManifest(vaultKey: Buffer, payload: SaltedPayload): ManifestContent {
+  const m = currentMessages();
   const value = decryptRecord(payload, vaultKey) as Record<string, unknown>;
   const ids = stringList(value.ids);
-  if (ids === null) throw new Error('manifesto inválido');
-  if (value.v !== MANIFEST_VERSION) throw new Error('manifesto inválido');
+  if (ids === null) throw new Error(m.errors.invalidManifest);
+  if (value.v !== MANIFEST_VERSION) throw new Error(m.errors.invalidManifest);
   const authIds = stringList(value.authIds);
-  if (authIds === null) throw new Error('manifesto inválido');
+  if (authIds === null) throw new Error(m.errors.invalidManifest);
   return { ids, authIds };
 }

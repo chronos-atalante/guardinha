@@ -31,7 +31,7 @@ describe('KeyUnwrapperFactory (Factory Method)', () => {
     expect(keyUnwrapperFor('recovery').kind).toBe('recovery');
     expect(keyUnwrapperFor('panic').kind).toBe('panic');
     expect(() => keyUnwrapperFor('unknown' as CredentialKind)).toThrow(
-      'método de desbloqueio desconhecido: unknown',
+      'Método de desbloqueio desconhecido: unknown',
     );
   });
 
@@ -87,7 +87,9 @@ describe('KeyUnwrapperFactory (Factory Method)', () => {
       payload: encryptRecord({ key: 'curta' }, derived),
     };
 
-    expect(() => keyUnwrapperFor('master').unwrap(method, derived)).toThrow('container corrompido');
+    expect(() => keyUnwrapperFor('master').unwrap(method, derived)).toThrow(
+      'Registro do cofre corrompido.',
+    );
   });
 
   it('o payload do embrulho só abre com a chave de trabalho certa', async () => {

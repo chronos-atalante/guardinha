@@ -2,7 +2,6 @@
 #
 # Substitui o perfil decorativo que o electron-builder gera por padrão
 # (`flags=(unconfined)`, que dá nome ao processo mas não restringe nada).
-# Origem: Doc/ANALISE.md, achado A1.
 #
 # O electron-builder roda este arquivo pelo `writeConfigFile`, que troca
 # `${...}` e **derruba o build** se a macro não existir: só `${executable}` e

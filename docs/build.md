@@ -134,7 +134,7 @@ actions estão fixadas por SHA e atualizadas pelo Dependabot.
 
 ## Versão do runner (`ubuntu-24.04`, não `ubuntu-latest`)
 
-Os sete jobs dos quatro workflows rodam em `ubuntu-24.04`, com o rótulo
+Os oito jobs dos quatro workflows rodam em `ubuntu-24.04`, com o rótulo
 escrito à mão em vez do `ubuntu-latest`.
 
 Motivo: em **19/10/2026** o `ubuntu-latest` do GitHub passa a apontar para o
@@ -166,7 +166,7 @@ Sobre o Dependabot: ele **não** é o que segura nada aqui. Os workflows fixam a
 actions por SHA completo, e o Dependabot (`github-actions`) só abre PR para
 mover esses pins. Se ninguém mesclar esses PRs, nada quebra: os pins atuais
 (`checkout` v7.0.1, `setup-node` v7.0.0, `codeql-action` v4.38.2,
-`upload-artifact` v4.6.2) seguem funcionando. O que para de acontecer é a
+`upload-artifact` v7.0.2) seguem funcionando. O que para de acontecer é a
 chegada automática de correção de segurança das actions, e isso é revisão de
 ponta, não automação. Já a migração do runner é mudança da **imagem**, invisível
 para o Dependabot: foi por isso que o `ubuntu-latest` precisou ser fixado à mão.
@@ -179,13 +179,14 @@ momento em que a versão sai). Sem ele, erro de tipo, formatação quebrada,
 dependência vulnerável, teste vermelho ou cobertura abaixo de 95% só apareceriam
 depois do merge.
 
-| Gatilho                    | O que roda                                            |
-| -------------------------- | ----------------------------------------------------- |
-| push na `developer`        | "Verificar qualidade" e "Testes e cobertura"          |
-| PR para `main`/`developer` | os dois, e é o par de status checks que trava o merge |
-| execução manual            | os dois, para conferir na mão um passo local duvidoso |
+| Gatilho                    | O que roda                                                        |
+| -------------------------- | ----------------------------------------------------------------- |
+| push na `developer`        | "Verificar qualidade", "Testes e cobertura" e "Testes de mutação" |
+| PR para `main`/`developer` | os dois primeiros, e é o par de status checks que trava o merge   |
+| execução manual            | os três, para conferir na mão um passo local duvidoso             |
 
-Dois jobs independentes, para a falha apontar o culpado:
+Dois jobs independentes no ritmo normal, para a falha apontar o culpado, e um
+terceiro em outro ritmo:
 
 - **Verificar qualidade**: `npm run check` (tipos, lint, formato, auditoria OSV,
   shellcheck). Instala `bin/osv-scanner` e `bin/shellcheck` do mesmo jeito que o
@@ -194,11 +195,17 @@ Dois jobs independentes, para a falha apontar o culpado:
   `vitest.config.mts`. Publica a tabela no resumo da execução e sobe o relatório
   HTML como artefato (`cobertura-relatorio`, 14 dias), que é o que serve para
   achar a linha que derrubou o número.
+- **Testes de mutação**: a varredura de `tools/mutation/` (`docs/mutation.md`).
+  Roda em push na `developer`, uma vez por mês e por disparo manual, **não** em
+  pull request nem em push para a `main`, porque leva horas e o número que ela
+  mede só muda quando alguém escreve teste novo. Reprova abaixo de 65%, e por
+  isso não é status check obrigatório: ela informa e reprova, mas não segura o
+  merge.
 
-Para o merge ficar travado de verdade, marque os dois status checks como
-obrigatórios nas regras de proteção da `main` (Settings > Branches > Branch
-protection rules). Sem isso o workflow é informativo: ele roda, mas ninguém é
-obrigado a esperar.
+Para o merge ficar travado de verdade, marque os dois status checks do ritmo
+normal como obrigatórios nas regras de proteção da `main` (Settings > Branches >
+Branch protection rules). Sem isso o workflow é informativo: ele roda, mas
+ninguém é obrigado a esperar.
 
 ## Outros workflows
 

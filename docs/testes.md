@@ -1,6 +1,6 @@
 # Testes
 
-Suíte Vitest com 51 arquivos `*.test.ts` e `*.test.tsx`, agrupados por domínio.
+Suíte Vitest com 64 arquivos `*.test.ts` e `*.test.tsx`, agrupados por domínio.
 O ambiente padrão é jsdom; a maioria dos testes do processo main declara
 `@vitest-environment node`, e os testes do renderer usam jsdom. O teste do
 carregador de módulos também inicia o Node real em um processo filho. Os testes
@@ -24,59 +24,72 @@ e o score é uma medida de tendência, não um portão.
 
 ## Arquivos
 
-| Arquivo                                     | O que cobre                                                                 |
-| ------------------------------------------- | --------------------------------------------------------------------------- |
-| `tests/main/activity.test.ts`               | Temporizador de inatividade e assinaturas do `ActivityMonitor`.             |
-| `tests/main/auth-store.test.ts`             | Persistência dos tokens TOTP.                                               |
-| `tests/main/auth.test.ts`                   | Trava exponencial, validações de formato e contadores de falha.             |
-| `tests/main/authenticator.test.ts`          | Regras dos tokens, segredo e integração com o manifesto.                    |
-| `tests/main/clipboard.test.ts`              | Limpeza programada do clipboard e descarte do proxy.                        |
-| `tests/main/container.test.ts`              | Formatos do container e payload, versão 5, cabeçalho e flags.               |
-| `tests/main/create-permission.test.ts`      | Cancelamento da criação quando a autorização de diretório falha.            |
-| `tests/main/crypto.test.ts`                 | Argon2id, cifragem de registros, gerador e frase de recuperação.            |
-| `tests/main/entries.rules.test.ts`          | Validações das credenciais salvas.                                          |
-| `tests/main/entrypoint.test.ts`             | Inicialização e registro dos canais do processo principal.                  |
-| `tests/main/erase.test.ts`                  | Cryptographic Erase, temporários e prevenção contra recriação do container. |
-| `tests/main/facade.test.ts`                 | Operações de persistência pela fachada.                                     |
-| `tests/main/layout.test.ts`                 | Resolução dos caminhos do cofre e overrides de ambiente.                    |
-| `tests/main/logging.test.ts`                | Supressão e filtragem dos logs do Chromium.                                 |
-| `tests/main/node-loader.test.ts`            | Resolução dos aliases ao executar TypeScript no Node real.                  |
-| `tests/main/panic.test.ts`                  | PIN de coação, trava e limite de tentativas da senha mestra.                |
-| `tests/main/preload.test.ts`                | Contrato e encaminhamento IPC do preload.                                   |
-| `tests/main/privilege.test.ts`              | Invocação segura do helper PolicyKit.                                       |
-| `tests/main/session.test.ts`                | Ciclo de vida da chave, sessão decoy e ligação ao auto-lock.                |
-| `tests/main/settings.test.ts`               | Leitura, normalização e gravação das preferências.                          |
-| `tests/main/shred.test.ts`                  | Sobrescrita, remoção, `O_NOFOLLOW` e diretórios.                            |
-| `tests/main/storage.test.ts`                | Container, manifesto, permissões e validação dos ids.                       |
-| `tests/main/totp.test.ts`                   | Vetores oficiais e cálculo HOTP/TOTP.                                       |
-| `tests/main/unlock.test.ts`                 | Cadeia de desbloqueio, formato, tentativas e ordem da trava.                |
-| `tests/main/unwrapping.test.ts`             | Embrulho e desembrulho por método de credencial.                            |
-| `tests/main/vault.guardrails.test.ts`       | Guardas e condições de borda do ciclo de vida do cofre.                     |
-| `tests/main/vault.test.ts`                  | Criação, desbloqueio, redefinição e estado do cofre.                        |
-| `tests/main/window.test.ts`                 | Navegação, permissões, IPC, eventos e política da janela.                   |
-| `tests/renderer/App.tabs.test.tsx`          | Navegação entre abas e estado geral do app.                                 |
-| `tests/renderer/App.test.tsx`               | Fluxos gerais de criação, desbloqueio e uso do app.                         |
-| `tests/renderer/AuthModal.test.tsx`         | Formulários de criação, desbloqueio e redefinição de PIN.                   |
-| `tests/renderer/Authenticator.test.tsx`     | Lista de tokens, códigos e ações do autenticador.                           |
-| `tests/renderer/Credits.test.tsx`           | Créditos e lista de dependências.                                           |
-| `tests/renderer/DestroyModal.test.tsx`      | Confirmação em duas etapas da destruição.                                   |
-| `tests/renderer/EntryModal.test.tsx`        | Formulário de credencial e validação visual.                                |
-| `tests/renderer/Generator.test.tsx`         | Opções, geração, cópia e apresentação de senha.                             |
-| `tests/renderer/Home.test.tsx`              | Lista, busca e ações das credenciais.                                       |
-| `tests/renderer/LanguageSelect.test.tsx`    | Seletor e persistência de idioma.                                           |
-| `tests/renderer/SensitivitySlider.test.tsx` | Interação acessível com o slider do gerador.                                |
-| `tests/renderer/Settings.nuke.test.tsx`     | Configuração do limite de autodestruição.                                   |
-| `tests/renderer/Settings.test.tsx`          | Configuração do PIN de coação e comportamento de Settings.                  |
-| `tests/renderer/Sidebar.test.tsx`           | Navegação, idioma e ações da barra lateral.                                 |
-| `tests/renderer/clipboard.test.ts`          | Encaminhamento da cópia pelo canal IPC do main.                             |
-| `tests/renderer/formatters.test.ts`         | Formatação de mensagens e contagem regressiva.                              |
-| `tests/renderer/i18n.test.tsx`              | Provider, hooks e renderização de mensagens localizadas.                    |
-| `tests/shared/base32.test.ts`               | Normalização e decodificação Base32.                                        |
-| `tests/shared/otpauth.test.ts`              | Parse de URIs `otpauth://`.                                                 |
-| `tests/shared/strategy.test.ts`             | Estratégia de avaliação de força por tipo.                                  |
-| `tests/shared/strength.test.ts`             | Pontuação, motivos e bloqueios da checagem de força.                        |
-| `tests/messages/functions.test.ts`          | Forma e comportamento das funções de mensagem.                              |
-| `tests/messages/parity.test.ts`             | Paridade de chaves, tipos e idiomas entre os bundles.                       |
+| Arquivo                                         | O que cobre                                                                 |
+| ----------------------------------------------- | --------------------------------------------------------------------------- |
+| `tests/main/activity.test.ts`                   | Temporizador de inatividade e assinaturas do `ActivityMonitor`.             |
+| `tests/main/auth-store.test.ts`                 | Persistência dos tokens TOTP.                                               |
+| `tests/main/auth.test.ts`                       | Trava exponencial, validações de formato e contadores de falha.             |
+| `tests/main/authenticator.test.ts`              | Regras dos tokens, segredo e integração com o manifesto.                    |
+| `tests/main/clipboard.test.ts`                  | Limpeza programada do clipboard e descarte do proxy.                        |
+| `tests/main/container.test.ts`                  | Formatos do container e payload, versão 5, cabeçalho e flags.               |
+| `tests/main/create-permission.test.ts`          | Cancelamento da criação quando a autorização de diretório falha.            |
+| `tests/main/crypto.test.ts`                     | Argon2id, cifragem de registros, gerador e frase de recuperação.            |
+| `tests/main/entries.rules.test.ts`              | Validações das credenciais salvas.                                          |
+| `tests/main/entrypoint.test.ts`                 | Inicialização e registro dos canais do processo principal.                  |
+| `tests/main/entrypoint-ready-rejection.test.ts` | Falha de `whenReady` registrada, sem inicialização silenciosa.              |
+| `tests/main/entrypoint-single-instance.test.ts` | Lock de instância única e o encerramento sem abrir janela.                  |
+| `tests/main/erase.test.ts`                      | Cryptographic Erase, temporários e prevenção contra recriação do container. |
+| `tests/main/erasure-state.test.ts`              | A guarda que impede o container de ressuscitar depois do erase.             |
+| `tests/main/facade.test.ts`                     | Operações de persistência pela fachada.                                     |
+| `tests/main/generator.test.ts`                  | Conjunto de caracteres, entropia pessoal e recusa do pedido inválido.       |
+| `tests/main/layout.test.ts`                     | Resolução dos caminhos do cofre e overrides de ambiente.                    |
+| `tests/main/logging.test.ts`                    | Supressão e filtragem dos logs do Chromium.                                 |
+| `tests/main/node-loader.test.ts`                | Resolução dos aliases ao executar TypeScript no Node real.                  |
+| `tests/main/panic.test.ts`                      | PIN de coação, trava e limite de tentativas da senha mestra.                |
+| `tests/main/preload.test.ts`                    | Contrato e encaminhamento IPC do preload.                                   |
+| `tests/main/privilege.test.ts`                  | Invocação segura do helper PolicyKit.                                       |
+| `tests/main/protocol.test.ts`                   | Scheme `guardinha://`, guarda de origem, preload e ícone.                   |
+| `tests/main/session.test.ts`                    | Ciclo de vida da chave, sessão decoy e ligação ao auto-lock.                |
+| `tests/main/settings.test.ts`                   | Leitura, normalização e gravação das preferências.                          |
+| `tests/main/shred.test.ts`                      | Sobrescrita, remoção, `O_NOFOLLOW` e diretórios.                            |
+| `tests/main/storage.test.ts`                    | Container, manifesto, permissões e validação dos ids.                       |
+| `tests/main/structure.test.ts`                  | Escrita atômica, modo dos arquivos e modos das pastas.                      |
+| `tests/main/totp.test.ts`                       | Vetores oficiais e cálculo HOTP/TOTP.                                       |
+| `tests/main/unlock.test.ts`                     | Cadeia de desbloqueio, formato, tentativas e ordem da trava.                |
+| `tests/main/unwrapping.test.ts`                 | Embrulho e desembrulho por método de credencial.                            |
+| `tests/main/vault-create-retry.test.ts`         | Retentativa da criação depois do setup privilegiado.                        |
+| `tests/main/vault.guardrails.test.ts`           | Guardas e condições de borda do ciclo de vida do cofre.                     |
+| `tests/main/vault.test.ts`                      | Criação, desbloqueio, redefinição e estado do cofre.                        |
+| `tests/main/window.test.ts`                     | Navegação, permissões, IPC, eventos e política da janela.                   |
+| `tests/renderer/App.tabs.test.tsx`              | Navegação entre abas e estado geral do app.                                 |
+| `tests/renderer/App.test.tsx`                   | Fluxos gerais de criação, desbloqueio e uso do app.                         |
+| `tests/renderer/AuthModal.test.tsx`             | Formulários de criação, desbloqueio e redefinição de PIN.                   |
+| `tests/renderer/Authenticator.test.tsx`         | Lista de tokens, códigos e ações do autenticador.                           |
+| `tests/renderer/Credits.test.tsx`               | Créditos e lista de dependências.                                           |
+| `tests/renderer/DestroyModal.test.tsx`          | Confirmação em duas etapas da destruição.                                   |
+| `tests/renderer/EntryModal.test.tsx`            | Formulário de credencial e validação visual.                                |
+| `tests/renderer/Generator.test.tsx`             | Opções, geração, cópia e apresentação de senha.                             |
+| `tests/renderer/Home.test.tsx`                  | Lista, busca e ações das credenciais.                                       |
+| `tests/renderer/LanguageSelect.test.tsx`        | Seletor e persistência de idioma.                                           |
+| `tests/renderer/SelectField.test.tsx`           | Menu próprio do seletor: teclado, foco e clique fora.                       |
+| `tests/renderer/SensitivitySlider.test.tsx`     | Interação acessível com o slider do gerador.                                |
+| `tests/renderer/Settings.nuke.test.tsx`         | Configuração do limite de autodestruição.                                   |
+| `tests/renderer/Settings.test.tsx`              | Configuração do PIN de coação e comportamento de Settings.                  |
+| `tests/renderer/Sidebar.test.tsx`               | Navegação, idioma e ações da barra lateral.                                 |
+| `tests/renderer/StrengthMeter.test.tsx`         | Nível, segmentos, motivo e dica da barra de força.                          |
+| `tests/renderer/Toast.test.tsx`                 | Temporizador do aviso flutuante e descarte sem mensagem.                    |
+| `tests/renderer/clipboard.test.ts`              | Encaminhamento da cópia pelo canal IPC do main.                             |
+| `tests/renderer/formatters.test.ts`             | Formatação de mensagens e contagem regressiva.                              |
+| `tests/renderer/i18n.test.tsx`                  | Provider, hooks e renderização de mensagens localizadas.                    |
+| `tests/shared/base32.test.ts`                   | Normalização e decodificação Base32.                                        |
+| `tests/shared/format.test.ts`                   | Contagem regressiva da trava e texto de erro que atravessa o IPC.           |
+| `tests/shared/otpauth.test.ts`                  | Parse de URIs `otpauth://`.                                                 |
+| `tests/shared/policy.test.ts`                   | Formato de PIN, senha mestra, frase e UUID.                                 |
+| `tests/shared/strategy.test.ts`                 | Estratégia de avaliação de força por tipo.                                  |
+| `tests/shared/strength.test.ts`                 | Pontuação, motivos e bloqueios da checagem de força.                        |
+| `tests/messages/functions.test.ts`              | Forma e comportamento das funções de mensagem.                              |
+| `tests/messages/parity.test.ts`                 | Paridade de chaves, tipos e idiomas entre os bundles.                       |
+| `tests/tools/mutation-runner.test.ts`           | Planejamento, seleção de testes e o mutante entrando na execução.           |
 
 Apoios: `tests/mocks/electron.ts` (stub do `electron` aplicado por alias),
 `tests/mocks/api.ts` (contrato completo de `window.api` para os testes de

@@ -333,5 +333,13 @@ export const ja: Messages = {
       '設定キーは有効な Base32（A-Z と 2-7）で、128 ビット（16 バイト）以上である必要があります。',
     authTokenNotFound: '2FA トークンが見つかりません。',
     internal: '金庫内部のエラーです。',
+    /** Guarda de origem do IPC: o emissor não é a página oficial do app. */
+    foreignFrame: 'IPC ブロック：リクエストがアプリのページからではありません。',
+    containerCorrupted: '金庫のレコードが破損しています。',
+    invalidManifest: '整合性マニフェストが無効です。',
+    invalidKdfParams: 'KDF パラメータが無効です。',
+    unknownUnlockMethod: (kind: string): string => `不明なロック解除方式：${kind}`,
+    truncatedDigest: 'HMAC ダイジェストが切り詰められています。',
+    shortPhrase: 'リカバリーフレーズが短すぎます。',
   },
 };

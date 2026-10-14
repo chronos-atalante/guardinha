@@ -85,7 +85,7 @@ que é testar o CSS e medir o componente por uma coisa que ele não decide.
 
 ## Como a varredura fica barata
 
-Uma execução da suíte inteira custa 84 s. Multiplicada por 2.560 mutantes, a
+Uma execução da suíte inteira custa 84 s. Multiplicada por 2.557 mutantes, a
 varredura seria de dias. O que reduz isso:
 
 - **Seleção por linha.** Uma matriz arquivo de teste → linhas de `src/`
@@ -162,7 +162,7 @@ do resto do workflow:
 Ela **não** roda em pull request nem em push para a `main`. A varredura leva
 horas e o número que ela mede só muda quando alguém escreve teste novo; a única
 coisa que ela faz por um PR é mudar de verde para vermelho sem dizer nada sobre o
-PR. Reprova abaixo de **65%**, com o número medido hoje em 70,2%.
+PR. Reprova abaixo de **65%**, com o número medido hoje em 69,4%.
 
 | Input           | Efeito                                                      |
 | --------------- | ----------------------------------------------------------- |
@@ -203,6 +203,7 @@ nada.
 | `tools/mutation/coverage.ts`       | Leitura do relatório do v8 e filtro de linha alcançada.         |
 | `tools/mutation/plugin.ts`         | Plugin do Vite que injeta o mutante no módulo alvo.             |
 | `tools/mutation/scope.ts`          | O que entra e o que sai, com o motivo de cada exclusão.         |
+| `tools/mutation/types.ts`          | O veredito do mutante e o formato do resultado gravado.         |
 | `tools/mutation/hash-wasm-stub.ts` | Doppelgänger barato do Argon2id para a varredura.               |
 | `vitest.mutation.config.mts`       | Config de Vitest da varredura.                                  |
 

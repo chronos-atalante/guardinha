@@ -392,7 +392,9 @@ export async function resetPin(input: ResetPinInput): Promise<VaultResult> {
   const recovery = keyUnwrapperFor('recovery');
   try {
     const phrase = normalizeRecoveryPhrase(input.phrase);
-    if (phrase.split(' ').length < RECOVERY_MIN_WORDS) throw new Error('frase curta');
+    if (phrase.split(' ').length < RECOVERY_MIN_WORDS) {
+      throw new Error(m.errors.shortPhrase);
+    }
     const derived = await recovery.derive(method, phrase);
     // a chave de trabalho sai da RAM mesmo se o desembrulho falhar, então o
     // zero fica no `finally` e não no corpo feliz

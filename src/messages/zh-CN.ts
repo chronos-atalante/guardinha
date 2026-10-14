@@ -314,5 +314,13 @@ export const zhCN: Messages = {
     invalidAuthSecret: '设置密钥必须是有效的 Base32（A-Z 和 2-7），且至少包含 128 位（16 字节）。',
     authTokenNotFound: '未找到该 2FA 令牌。',
     internal: '密码库内部错误。',
+    /** Guarda de origem do IPC: o emissor não é a página oficial do app. */
+    foreignFrame: 'IPC 已阻止：请求并非来自应用页面。',
+    containerCorrupted: '密码库记录已损坏。',
+    invalidManifest: '完整性清单无效。',
+    invalidKdfParams: 'KDF 参数无效。',
+    unknownUnlockMethod: (kind: string): string => `未知的解锁方式：${kind}`,
+    truncatedDigest: 'HMAC 摘要被截断。',
+    shortPhrase: '恢复短语过短。',
   },
 };

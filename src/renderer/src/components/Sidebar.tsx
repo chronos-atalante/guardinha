@@ -86,8 +86,9 @@ export function Sidebar({
             <Lock className="w-3.5 h-3.5" />
             {m.app.lock}
           </button>
-          {/* A autodestruição é irreversível: fica longe do "Bloquear cofre" e
-              ainda exige digitar uma palavra no diálogo. */}
+          {/* A autodestruição é irreversível: fica logo abaixo do "Bloquear
+              cofre", a um clique dele, e ainda exige digitar uma palavra no
+              diálogo antes de fazer qualquer coisa. */}
           <button
             type="button"
             onClick={onDestroy}
