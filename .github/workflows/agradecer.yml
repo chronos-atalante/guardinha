@@ -4,6 +4,11 @@ name: Agradecer contribuições
 # Usa pull_request_target porque PRs de fork só têm token de leitura no
 # evento pull_request; como não há checkout nem execução de código do fork,
 # só a chamada de API, é seguro.
+#
+# Em 02/11/2026 o GitHub bloqueia pull_request_target por padrão em repositório
+# público. O guardinha é público, então este workflow só continua rodando com uma
+# política de Ações que permita o evento, e limitada a este arquivo. O comando
+# e as conferências estão em docs/build.md.
 on:
   pull_request_target:
     types: [closed]
@@ -25,10 +30,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Comentar agradecimento
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          node-version: 24
-          ref: ${{ github.event.pull_request.head.sha }}
           script: |
             const pr = context.payload.pull_request;
             const body = [
