@@ -105,8 +105,6 @@ entrada. Mudanças voltadas ao usuário ganham entrada em
   as versões das GitHub Actions.
 - `.github/workflows/codeql.yml` roda o CodeQL em push/PR para `main` e toda
   segunda-feira, complementando o `npm run security:audit`.
-- Ao mesclar um PR, `.github/workflows/agradecer.yml` deixa um comentário de
-  agradecimento.
 
 ## 10. Commits e lançamentos
 
