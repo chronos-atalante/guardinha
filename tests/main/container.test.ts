@@ -84,6 +84,26 @@ function sampleContainer(): VaultContainerData {
   };
 }
 
+/** Bytes que um método ocupa no container: KDF(12) + kdfSalt(16) + blob. */
+function methodBytes(method: WrappedMethod): number {
+  return 12 + 16 + 52 + Buffer.from(method.payload.encryptedData, 'hex').length;
+}
+
+/** Deslocamento do manifesto: cabeçalho + os quatro métodos, na ordem do formato. */
+function manifestOffset(data: VaultContainerData): number {
+  const { master, pin, recovery, panic } = data.methods;
+  if (master === undefined || pin === undefined || recovery === undefined || panic === undefined) {
+    throw new Error('fixture incompleta');
+  }
+  return (
+    HEADER_BYTES +
+    methodBytes(master) +
+    methodBytes(pin) +
+    methodBytes(recovery) +
+    methodBytes(panic)
+  );
+}
+
 /** Roundtrip: o resultado cru, com o motivo da recusa quando houver. */
 function roundtrip(data: VaultContainerData): VaultUnpackResult {
   return unpackVaultContainer(packVaultContainer(data));
@@ -256,6 +276,17 @@ describe('container do cofre (vault.zkv)', () => {
     expect(refusal(packed.subarray(0, 8))).toBe('damaged');
   });
 
+  it('aceita um cofre só com PIN, sem inventar método de master', () => {
+    // O byte de flags começa zerado. Se ele já nascesse com o bit do master
+    // ligado, o leitor tentaria abrir um método que não existe antes do PIN e
+    // recusaria um cofre perfeitamente válido.
+    const data = sampleContainer();
+    delete data.methods.master;
+    const restored = packed(data);
+    expect(restored.methods.master).toBeUndefined();
+    expect(restored.methods.pin?.kdf).toEqual(KDF_PIN);
+  });
+
   it('recusa container sem nenhum método de desbloqueio', () => {
     const data = sampleContainer();
     data.methods = {};
@@ -307,6 +338,21 @@ describe('payload de entrada (.zke)', () => {
   it('recusa payload em JSON, que era o layout antigo', () => {
     // o `.enc` em JSON não existe mais: um arquivo assim não é uma credencial
     expect(unpackEntryPayload(Buffer.from('{"salt":"aa"}', 'utf8'))).toBeNull();
+  });
+
+  it('roundtrip de um payload sem texto cifrado, que ocupa só o cabeçalho', () => {
+    // `ctLen = 0` é um tamanho legal: o `.zke` tem 60 bytes de cabeçalho e nada
+    // depois. A guarda de tamanho é `<`, então esse arquivo é aceito, e é assim
+    // que o reader sabe a diferença entre "vazio" e "cortado no meio".
+    const payload = {
+      salt: 'aa'.repeat(16),
+      iv: 'bb'.repeat(16),
+      tag: 'cc'.repeat(16),
+      encryptedData: '',
+    };
+    const packed = packEntryPayload(payload);
+    expect(packed).toHaveLength(60);
+    expect(unpackEntryPayload(packed)).toEqual(payload);
   });
 });
 
@@ -391,6 +437,10 @@ describe('leitura fail-closed de buffer truncado', () => {
     // fecha o `readBlob` é o tamanho **declarado** do texto ser maior que o que
     // sobrou, e isso só acontece num corte qualquer, entre o fim do cabeçalho e
     // o fim do texto. Varrer todos os cortes pega essa janela; as frações não.
+    //
+    // O motivo também é conferido em cada corte: a tela differentiate "cofre de
+    // outra versão" de "arquivo danificado", então uma recusa sem nome algum é
+    // um mutante que sobrevive.
     const payload = encryptRecord({ title: 'GitHub' }, randomBytes(32));
     const packed = packEntryPayload(payload);
     for (let cut = 1; cut < packed.length; cut++) {
@@ -399,8 +449,24 @@ describe('leitura fail-closed de buffer truncado', () => {
 
     const container = packVaultContainer(sampleContainer());
     for (let cut = 1; cut < container.length; cut++) {
-      expect(damaged(container.subarray(0, cut)).ok).toBe(false);
+      expect(damaged(container.subarray(0, cut))).toEqual({ ok: false, reason: 'damaged' });
     }
+  });
+
+  it('aceita um blob de tamanho zero que fecha exatamente o arquivo', () => {
+    // Guarda de `readBlob`: o cabeçalho do blob tem 52 bytes e pode ser a última
+    // coisa do arquivo, com `ctLen = 0`. O corte é `>`, não `>=`: um arquivo que
+    // termina exatamente no fim do cabeçalho é um blob vazio, não truncamento.
+    const data = sampleContainer();
+    const packed = packVaultContainer(data);
+    const manifestAt = manifestOffset(data);
+    const exact = packed.subarray(0, manifestAt + 52);
+    exact.writeUInt32BE(0, manifestAt + 48);
+
+    const read = unpackVaultContainer(Buffer.from(exact));
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.data.manifest?.encryptedData).toBe('');
   });
 
   it('recusa flag desconhecida no cabeçalho', () => {
@@ -479,5 +545,15 @@ describe('recusa do manifesto pela mensagem', () => {
     const blob = sealManifest(key, IDS, ['a', 'b']);
 
     expect(openManifest(key, blob)).toEqual({ ids: IDS, authIds: ['a', 'b'] });
+  });
+
+  it('recusa um manifesto gravado com a versão seguinte', () => {
+    // O teste acima só prova que o par escreve e lê a mesma versão. Este é o
+    // outro lado do contrato: um manifesto selado com 3 (o número que a próxima
+    // versão usaria) tem de ser recusado, senão subir a versão abriria em silêncio
+    // os arquivos que a versão de hoje gravou.
+    const key = randomBytes(32);
+    const future = encryptRecord({ v: 3, ids: IDS, authIds: [] }, key);
+    expect(() => openManifest(key, future)).toThrow('manifesto inválido');
   });
 });

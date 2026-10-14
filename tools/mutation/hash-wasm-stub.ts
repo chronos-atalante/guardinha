@@ -32,7 +32,16 @@ interface Argon2Options {
   outputType?: 'hex' | 'binary';
 }
 
+/** O que o `hash-wasm` de verdade aceita em `outputType`. */
+const OUTPUT_TYPES = new Set(['hex', 'binary', 'encoded']);
+
 export function argon2id(options: Argon2Options): Promise<Uint8Array | string> {
+  // O doppelgänger não pode ser mais permissivo que a biblioteca real: um
+  // `outputType` inválido é erro lá, e aceitar aqui esconderia um mutante que
+  // a suíte tem como matar (o `outputType: 'hex'` de `deriveKey`).
+  if (options.outputType !== undefined && !OUTPUT_TYPES.has(options.outputType)) {
+    throw new Error(`Insupported output type ${options.outputType}`);
+  }
   // `memorySize` e `parallelism` entram no salt porque o PBKDF2 não os tem:
   // sem isso, dois coframes com custos diferentes e o mesmo salt dariam a mesma
   // chave, e a suíte não veria a diferença entre eles.

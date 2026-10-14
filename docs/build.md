@@ -89,8 +89,14 @@ Remove link, perfil do AppArmor e a ação do PolicyKit. **Os dados em
 - `npm run check` antes de commitar (é a barra do CONTRIBUTING).
 - `after-install.sh`, `after-remove.sh` e `guardinha-setup` passam pelo
   shellcheck (`npm run lint:shell`).
-- As dependências passam pelo OSV Scanner (`npm run security:audit`, filtro em
-  `.osv-scanner.toml`).
+- As dependências passam pelo OSV Scanner (`npm run security:audit`). O comando
+  roda com `--all-vulns` (mostra também o que o scanner julga sem importance ou
+  não chamado), `--experimental-flag-deprecated-packages` (versão abandonada é
+  dívida) e `--licenses` com uma allowlist de licença: o `.deb` é distribuído e
+  há `THIRD-PARTY-NOTICES.txt` para manter honesto, então licença copyleft
+  (GPL, AGPL, SSPL, BUSL) ou ausente reprova o `check`. As bandeiras e o motivo
+  de cada entrada da allowlist estão em `.osv-scanner.toml` e no
+  `scripts.security:audit`, no `package.json`.
 - Fuses do Electron no bloco `build.electronFuses` do `package.json`:
   `runAsNode`, `enableNodeOptionsEnvironmentVariable` e
   `enableNodeCliInspectArguments` desligados; `enableCookieEncryption` e

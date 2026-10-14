@@ -76,6 +76,13 @@ entradas (`LEVELS`, `COMMON_WORDS`, `OTP_ALGORITHMS`): mutar uma entrada mede se
 a suíte confere item por item o conjunto que o código carrega, e não se o código
 que consome o conjunto funciona.
 
+Nem mexe em atributo de JSX de apresentação (`className`, `type`,
+`autoComplete`, `inputMode`, `size`, `role`) nem em literal aninhado dentro do
+valor de um `className`, por mais fundo que esteja (`cond ? 'a' : 'b'`, tabela
+de constantes). Uma lista de classes do Tailwind é folha de estilo, não
+decisão: matar esse mutante exigiria que a suíte conferisse o texto da classe,
+que é testar o CSS e medir o componente por uma coisa que ele não decide.
+
 ## Como a varredura fica barata
 
 Uma execução da suíte inteira custa 84 s. Multiplicada por 2.560 mutantes, a
@@ -103,6 +110,18 @@ varredura seria de dias. O que reduz isso:
   é tudo que `tests/main/crypto.test.ts` verifica, e some em microssegundos. O
   stub só existe na varredura; o `npm test` continua usando o Argon2id de
   verdade, e nenhum teste compara a saída com um vetor do Argon2id.
+- **O doppelgänger não pode ser mais permissivo que a biblioteca.** O `hash-wasm`
+  de verdade lança `Insupported output type` para qualquer `outputType` fora de
+  `hex`, `binary` e `encoded`, e o stub faz o mesmo. Sem essa fidelidade, o
+  `outputType: 'hex'` de `deriveKey` sobrevivia à varredura inteiro: o mutante
+  trocado por `''` não mudava nada no doppelgänger, e a suíte via verde com um
+  `crypto.ts` que a biblioteca real rejeitaria. É o mesmo princípio do teste
+  de baseline, aplicado à fronteira de um módulo: um substituto mais tolerante
+  esconde o mutante.
+- **O `optional-chaining` só mexe no `?.` de verdade.** Em `a?.b.c` o Babel
+  aninha um segundo `OptionalMemberExpression` para o `.c`, com `optional:
+false`. Sem a checagem, esse nó gerava um mutante que troca `.` por `.`, que é
+  o mesmo texto: um sobrevivente que não é buraco de teste, é ruído.
 
 ## Garantias
 

@@ -257,8 +257,7 @@ export const zhCN: Messages = {
   /** Diálogo de autodestruição sob coação e pelo botão de pânico. */
   panic: {
     title: '立即销毁密码库',
-    subtitle:
-      '这会抹掉**整个密码库**，无法恢复。密钥会从内存中清除，' + '加密文件会在消失之前被覆写。',
+    subtitle: '这会抹掉**整个密码库**，无法恢复。密钥会从内存中清除，加密文件会在消失之前被覆写。',
     manualTitle: '自毁',
     manualSubtitle:
       '如果你认为有人要抢走这台电脑，就用这个功能。' +

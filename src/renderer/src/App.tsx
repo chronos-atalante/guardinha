@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { MessagesProvider, useMessages } from '@zero/renderer/i18n';
 import { Sidebar } from '@zero/renderer/components/Sidebar';
-import type { TabType } from '@zero/renderer/components/Sidebar';
 import { Home } from '@zero/renderer/components/Home';
 import { Generator } from '@zero/renderer/components/Generator';
 import { Authenticator } from '@zero/renderer/components/Authenticator';
@@ -11,7 +10,7 @@ import { Settings } from '@zero/renderer/components/Settings';
 import { AuthModal } from '@zero/renderer/components/AuthModal';
 import { DestroyModal } from '@zero/renderer/components/DestroyModal';
 import { Toast } from '@zero/renderer/components/Toast';
-import type { Language, VaultStatus } from '@zero/types';
+import type { Language, TabType, VaultStatus } from '@zero/types';
 
 /** Rede de segurança do auto-lock: o Observer do main é quem avisa, isto é o plano B. */
 const STATUS_POLL_MS = 15_000;

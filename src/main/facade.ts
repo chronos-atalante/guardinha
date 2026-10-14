@@ -29,12 +29,8 @@ import { eraseVault } from '@zero/main/erase';
 import { currentMessages } from '@zero/main/i18n';
 import { OTP_ALGORITHMS } from '@zero/shared';
 import type { OtpAlgorithm } from '@zero/shared';
-import type { PersistedAuthState } from '@zero/main/storage';
 import type { VaultContainerData } from '@zero/main/container';
-import type { Credential, EraseResult } from '@zero/types';
-
-/** Estado da trava que mora dentro do container; repassado para quem usa. */
-export type { PersistedAuthState };
+import type { Credential, EraseResult, PersistedAuthState, TempCleanupResult } from '@zero/types';
 
 function tampered(): Error {
   return new Error(currentMessages().errors.vaultTampered);
@@ -276,7 +272,7 @@ export class VaultStorageFacade {
    * Temporários órfãos de um crash, que o manifesto não cobre. Roda uma vez na
    * inicialização, antes do primeiro `getStatus` responder.
    */
-  public cleanTempFiles(maxAgeMs: number): { removed: number; kept: number } {
+  public cleanTempFiles(maxAgeMs: number): TempCleanupResult {
     return cleanStaleTempFiles(maxAgeMs);
   }
 }

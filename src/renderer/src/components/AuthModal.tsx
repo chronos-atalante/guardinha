@@ -12,7 +12,7 @@ import {
   RECOVERY_MIN_WORDS,
   strengthFor,
 } from '@zero/shared';
-import type { VaultStatus } from '@zero/types';
+import type { AuthMode, AuthStep, UnlockKind, VaultStatus } from '@zero/types';
 
 interface AuthModalProps {
   status: VaultStatus;
@@ -20,12 +20,18 @@ interface AuthModalProps {
   onRefresh: () => Promise<void>;
 }
 
+/** Uma aba do desbloqueio: o rótulo e qual forma de login ela abre. */
+interface UnlockTab {
+  key: UnlockKind;
+  label: string;
+}
+
 export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
   const m = useMessages();
   const isCreate = !status.exists;
 
   // ----- criação -----
-  const [step, setStep] = useState<'credentials' | 'recovery'>('credentials');
+  const [step, setStep] = useState<AuthStep>('credentials');
   const [master, setMaster] = useState('');
   const [masterConfirm, setMasterConfirm] = useState('');
   const [pin, setPin] = useState('');
@@ -33,7 +39,7 @@ export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
   const [phraseConfirm, setPhraseConfirm] = useState('');
 
   // ----- desbloqueio -----
-  const [mode, setMode] = useState<'pin' | 'master' | 'reset'>('pin');
+  const [mode, setMode] = useState<AuthMode>('pin');
   const [credential, setCredential] = useState('');
   const [resetPhrase, setResetPhrase] = useState('');
   const [newPin, setNewPin] = useState('');
@@ -420,7 +426,7 @@ export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
     );
   }
 
-  const tabs: { key: 'pin' | 'master'; label: string }[] = [{ key: 'pin', label: m.auth.tabPin }];
+  const tabs: UnlockTab[] = [{ key: 'pin', label: m.auth.tabPin }];
   if (showMaster) tabs.push({ key: 'master', label: m.auth.tabMaster });
 
   return shell(

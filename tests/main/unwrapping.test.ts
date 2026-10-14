@@ -1,5 +1,6 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import nodeCrypto from 'node:crypto';
+import { describe, expect, it, vi } from 'vitest';
 import { KDF_CREDENTIAL, KDF_PIN, decryptRecord, encryptRecord } from '@zero/main/crypto';
 import { isKdfUpToDate, keyUnwrapperFor } from '@zero/main/unwrapping';
 import type { CredentialKind } from '@zero/main/unwrapping';
@@ -109,4 +110,42 @@ describe('perfis de KDF por método de desbloqueio', () => {
     expect(keyUnwrapperFor('panic').kdf).toMatchObject(KDF_PIN);
     expect(keyUnwrapperFor('master').kdf.algo).toBe('argon2id');
   });
+});
+
+/**
+ * Cryptographic Erase da chave de embrulho. O `fill(0)` depois de cifrar o
+ * registro é o que impede que a chave derivada do Argon2id fique viva na pilha
+ * depois de `wrap`, e nada a observava: o resultado do `wrap` é idêntico com a
+ * chave zerada ou com `0x01` no lugar.
+ *
+ * A chave é capturada no `hkdfSync` porque é por ali que ela entra no cofre:
+ * `encryptRecord` a recebe como `vaultKey` e deriva o registro a partir dela.
+ * O Buffer é capturado **por referência**, como em `tests/main/crypto.test.ts`:
+ * só a referência continua apontando para o mesmo objeto depois do `fill`, e é
+ * esse objeto que precisa estar zerado quando o `wrap` termina.
+ */
+describe('apaga a chave de embrulho depois de envolver', () => {
+  it('a chave usada para cifrar o registro não sobrevive ao wrap', async () => {
+    const vistas: Buffer[] = [];
+    const original = nodeCrypto.hkdfSync;
+    vi.spyOn(nodeCrypto, 'hkdfSync').mockImplementation(((
+      digest: string,
+      key: Buffer,
+      salt: Buffer,
+      info: string,
+      length: number,
+    ): Buffer => {
+      vistas.push(key);
+      return original(digest, key, salt, info, length) as unknown as Buffer;
+    }) as unknown as typeof nodeCrypto.hkdfSync);
+
+    const envolvido = await keyUnwrapperFor('pin').wrap(VAULT_KEY, PIN);
+    vi.restoreAllMocks();
+
+    // o `wrap` chegou ao fim e produziu um método gravável
+    expect(envolvido.kdf).toMatchObject(KDF_PIN);
+    expect(envolvido.payload.encryptedData).not.toBe('');
+    expect(vistas.length).toBeGreaterThan(0);
+    for (const buffer of vistas) expect(buffer.every((byte) => byte === 0)).toBe(true);
+  }, 60_000);
 });

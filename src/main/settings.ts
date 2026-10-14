@@ -16,6 +16,11 @@ function settingsFile(): string {
   return path.join(configDir(), 'settings.json');
 }
 
+/** Objeto JSON para leitura campo a campo; qualquer outra forma é objeto vazio. */
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? { ...value } : {};
+}
+
 function normalizeLanguage(value: unknown): Language {
   if (typeof value === 'string' && (LANGUAGES as readonly string[]).includes(value)) {
     return value as Language;
@@ -26,8 +31,11 @@ function normalizeLanguage(value: unknown): Language {
 export function loadSettings(): AppSettings {
   if (!fs.existsSync(settingsFile())) return { language: 'pt-BR' };
   try {
-    const raw = fs.readJsonSync(settingsFile()) as { language?: unknown };
-    return { language: normalizeLanguage(raw.language) };
+    // `readJsonSync` devolve `any`: o arquivo é do usuário e pode ser qualquer
+    // coisa, então ele vira `unknown` e quem decide o formato é
+    // `normalizeLanguage`, não uma afirmação de tipo feita aqui.
+    const raw: unknown = fs.readJsonSync(settingsFile());
+    return { language: normalizeLanguage(asRecord(raw).language) };
   } catch {
     return { language: 'pt-BR' };
   }

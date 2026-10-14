@@ -178,6 +178,19 @@ describe('PIN de coação', () => {
     expect(fs.existsSync(containerFile())).toBe(true);
   });
 
+  it('o PIN de pânico não apaga o cofre quando chega pelo campo da senha mestra', async () => {
+    // O `tryPanicUnlock` exige as três coisas: método instalado, entrada em
+    // formato de PIN e PIN válido. Se a checagem de formato deixar de ser uma
+    // condição, o PIN de pânico (8 dígitos) entra pelo caminho da senha mestra,
+    // desembrulha a decoy e **apaga o cofre** de quem nem estava sob coação.
+    const result = await unlock({ credential: PANIC_PIN, kind: 'master' });
+
+    expect(result.ok).toBe(false);
+    expect(fs.existsSync(containerFile())).toBe(true);
+    expect(hasPanicPin()).toBe(true);
+    expect(vaultSession().isDecoy()).toBe(false);
+  });
+
   it('remove o caminho de pânico quando o PIN é apagado', async () => {
     clearPanicPin();
 

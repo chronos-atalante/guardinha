@@ -13,7 +13,6 @@ import {
   OTP_SECRET_MIN_BYTES,
   parseOtpAuthUri,
 } from '@zero/shared';
-import type { OtpAlgorithm } from '@zero/shared';
 import type { AuthCode, AuthToken, AuthTokenDraft } from '@zero/types';
 
 /**
@@ -27,16 +26,7 @@ import type { AuthCode, AuthToken, AuthTokenDraft } from '@zero/types';
  */
 
 /** Registro decifrado → o que o renderer enxerga (sem o segredo). */
-function toPublicToken(record: {
-  id: string;
-  issuer: string;
-  account: string;
-  algorithm: OtpAlgorithm;
-  digits: number;
-  period: number;
-  createdAt: number;
-  updatedAt: number;
-}): AuthToken {
+function toPublicToken(record: AuthToken): AuthToken {
   return {
     id: record.id,
     issuer: record.issuer,

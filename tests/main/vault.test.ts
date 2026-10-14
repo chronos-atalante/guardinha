@@ -6,6 +6,9 @@ import { resetAttempts } from '@zero/main/auth';
 import { KDF_CREDENTIAL, KDF_PIN, deriveKey, encryptRecord, randomBytes } from '@zero/main/crypto';
 import { currentMessages } from '@zero/main/i18n';
 import { listEntries, removeEntry, saveEntry } from '@zero/main/entries';
+import { vaultStorage } from '@zero/main/facade';
+import { keyUnwrapperFor } from '@zero/main/unwrapping';
+import { clearPanicPin, hasPanicPin, setPanicPin } from '@zero/main/vault';
 import { readVaultContainer, writeVaultContainer } from '@zero/main/storage';
 import {
   createVault,
@@ -322,4 +325,256 @@ describe('ciclo de vida do cofre (integração)', () => {
     fs.writeFileSync(containerFile, before);
     expect((await unlock({ credential: PIN, kind: 'pin' })).ok).toBe(true);
   }, 120_000);
+});
+
+/**
+ * Cryptographic Erase da chave de trabalho. São três `fill(0)` em `vault.ts`
+ * (desbloqueio de pânico, definição do PIN de pânico e redefinição por frase) e
+ * nenhum deles tinha teste: a suíte conferia o resultado da chamada, que é o
+ * mesmo com a chave zerada ou com `0x01` no lugar. O Buffer derivado é capturado
+ * por referência, então continua observável depois do `finally`.
+ */
+describe('apaga a chave derivada de trabalho', () => {
+  it('no desbloqueio pelo PIN de pânico', async () => {
+    await garanteDesbloqueado();
+    await setPanicPin({ pin: '74185236' });
+    resetAttempts();
+
+    // PIN que não é o de pânico nem o real: o caminho de pânico deriva, falha
+    // ao desembrulhar e devolve o controle. O cofre de teste fica intacto, e o
+    // `finally` do `tryPanicUnlock` é o que se quer exercitar aqui.
+    const derivadas = capturarDerivadas('panic');
+    const result = await unlock({ credential: '15975300', kind: 'pin' });
+    clearPanicPin();
+
+    expect(result.ok).toBe(false);
+    expect(getStatus().exists).toBe(true);
+    expect(derivadas.length).toBeGreaterThan(0);
+    for (const buffer of derivadas) expect(buffer.every((byte) => byte === 0)).toBe(true);
+  }, 120_000);
+
+  it('ao definir o PIN de pânico, no caminho em que o PIN é recusado', async () => {
+    await garanteDesbloqueado();
+    const derivadas = capturarDerivadas('pin');
+    // o PIN real passa a ser o PIN de pânico, que `setPanicPin` recusa
+    await setPanicPin({ pin: PIN });
+
+    expect(derivadas.length).toBeGreaterThan(0);
+    for (const buffer of derivadas) expect(buffer.every((byte) => byte === 0)).toBe(true);
+    clearPanicPin();
+  }, 120_000);
+
+  it('na redefinição do PIN pela frase de recuperação', async () => {
+    await garanteDesbloqueado();
+    resetAttempts();
+    const derivadas = capturarDerivadas('recovery');
+    const realNow = Date.now();
+    vi.useFakeTimers();
+    vi.setSystemTime(realNow + 11_000);
+    try {
+      await resetPin({ phrase: PHRASE, newPin: NEW_PIN });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(derivadas.length).toBeGreaterThan(0);
+    for (const buffer of derivadas) expect(buffer.every((byte) => byte === 0)).toBe(true);
+  }, 120_000);
+});
+
+/**
+ * O limite estrito é só da senha mestra. A frase de recuperação é o caminho que
+ * redesenha o PIN depois de uma coação, então ela não pode virar atalho para
+ * apagar o cofre: uma frase errada soma em `attempts`, e não em `attemptsMaster`.
+ */
+describe('a frase de recuperação não arma a autodestruição', () => {
+  it('conta tentativa comum, nunca a estrita', async () => {
+    await garanteDesbloqueado();
+    lock();
+    resetAttempts();
+    const antes = panicStatus();
+
+    const result = await resetPin({ phrase: WRONG_PHRASE, newPin: NEW_PIN });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe(currentMessages().errors.wrongRecovery);
+    // o contador estrito é o que decide a destruição: não pode ter se movido
+    expect(panicStatus().attemptsMaster).toBe(antes.attemptsMaster);
+    expect(result.status.attempts).toBeGreaterThan(0);
+  }, 120_000);
+
+  it('a resposta de recusa diz que o cofre existe e continua travado', async () => {
+    await garanteDesbloqueado();
+    lock();
+    resetAttempts();
+    const result = await resetPin({ phrase: WRONG_PHRASE, newPin: NEW_PIN });
+    expect(result.ok).toBe(false);
+    expect(result.status).toMatchObject({ exists: true, locked: true });
+  }, 120_000);
+});
+
+/**
+ * O PIN de pânico não pode ser o PIN de verdade: um PIN que abre o cofre e o
+ * destrói não serve nem como cofre nem como proteção.
+ */
+describe('o PIN de pânico recusa ser o PIN real', () => {
+  it('recusa, não instala e não deixa caminho de pânico', async () => {
+    // o teste anterior falhou de propósito e deixou trava exponencial
+    await garanteDesbloqueado();
+    clearPanicPin();
+    expect(hasPanicPin()).toBe(false);
+
+    // descobre qual é o PIN de verdade: o mesmo teste 8 pode ter trocado o PIN
+    const candidatos = [NEW_PIN, PIN];
+    let real: string | null = null;
+    for (const candidato of candidatos) {
+      const tentativa = await setPanicPin({ pin: candidato });
+      if (!tentativa.ok && tentativa.error === currentMessages().errors.panicPinSame) {
+        real = candidato;
+        break;
+      }
+      clearPanicPin();
+    }
+    expect(real).not.toBeNull();
+
+    if (real === null) throw new Error('nenhum PIN candidato era o do cofre');
+    const result = await setPanicPin({ pin: real });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe(currentMessages().errors.panicPinSame);
+    expect(hasPanicPin()).toBe(false);
+    clearPanicPin();
+  }, 120_000);
+});
+
+/**
+ * O arquivo é stateful e o teste 8 redefine o PIN, então `PIN` deixa de abrir o
+ * cofre a partir dali. O helper tenta o PIN atual e o anterior, sem pagar
+ * Argon2id duas vezes: só cai no segundo quando o primeiro é recusado.
+ */
+async function garanteDesbloqueado(): Promise<void> {
+  if (isUnlocked()) return;
+  resetAttempts();
+  const porCurrent = await unlock({ credential: NEW_PIN, kind: 'pin' });
+  if (!porCurrent.ok) {
+    resetAttempts();
+    await unlock({ credential: PIN, kind: 'pin' });
+  }
+}
+
+/** Espiona o desembrulhador e devolve os Buffers que ele devolveu. */
+function capturarDerivadas(kind: 'pin' | 'recovery' | 'panic'): Buffer[] {
+  const alvo = keyUnwrapperFor(kind);
+  const original = alvo.derive.bind(alvo);
+  const derivadas: Buffer[] = [];
+  vi.spyOn(alvo, 'derive').mockImplementation(async (method, credential) => {
+    const buffer = await original(method, credential);
+    derivadas.push(buffer);
+    return buffer;
+  });
+  return derivadas;
+}
+
+/** Faz a derivação do método recusar, como o Argon2id faria com custo absurdo. */
+function derivacaoFalha(kind: 'pin' | 'recovery' | 'panic'): void {
+  vi.spyOn(keyUnwrapperFor(kind), 'derive').mockRejectedValue(new Error('derivação falhou'));
+}
+
+/**
+ * A trava exponencial vale antes de qualquer coisa, inclusive quando falta um
+ * milissegundo para ela acabar. Com a comparação frouxa, uma redefinição que
+ * espere o último instante passaria direto pela trava.
+ */
+describe('a trava de redefinição de PIN é estrita', () => {
+  it('bloqueia a redefinição com 1 ms de espera restante', async () => {
+    await garanteDesbloqueado();
+    lock();
+    resetAttempts();
+    const realNow = Date.now();
+
+    const falhou = await resetPin({ phrase: WRONG_PHRASE, newPin: NEW_PIN });
+    expect(falhou.ok).toBe(false);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(realNow + 10_000 - 1);
+    try {
+      const result = await resetPin({ phrase: PHRASE, newPin: NEW_PIN });
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('Muitas tentativas');
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 120_000);
+});
+
+/**
+ * O `?.` do `finally` é o que deixa a limpeza da chave de trabalho sobreviver a
+ * uma derivação que já falhou: sem ele, um `TypeError` em `null.fill(0)`
+ * substitui a resposta de "credencial errada" e derruba a tela de autenticação
+ * com uma exceção que ninguém entende.
+ */
+describe('falha de derivação não vira exceção', () => {
+  it('no desbloqueio com PIN de pânico instalado', async () => {
+    await garanteDesbloqueado();
+    await setPanicPin({ pin: '74185236' });
+    resetAttempts();
+    derivacaoFalha('panic');
+
+    let recusa: unknown;
+    try {
+      recusa = await unlock({ credential: '15975300', kind: 'pin' });
+    } finally {
+      vi.restoreAllMocks();
+      clearPanicPin();
+    }
+
+    expect(recusa).toMatchObject({ ok: false });
+    expect(getStatus().exists).toBe(true);
+  }, 120_000);
+
+  it('ao recusar o PIN de pânico porque é o PIN do cofre', async () => {
+    await garanteDesbloqueado();
+    derivacaoFalha('pin');
+
+    let instalacao: unknown;
+    try {
+      instalacao = await setPanicPin({ pin: PIN });
+    } finally {
+      vi.restoreAllMocks();
+      clearPanicPin();
+    }
+
+    // a derivação recusou, então o PIN não é o do cofre: ele instala
+    expect(instalacao).toMatchObject({ ok: true });
+    expect(hasPanicPin()).toBe(false);
+  }, 120_000);
+});
+
+/**
+ * Sem cofre no disco, os dois pontos que leem o container devolvem "não há PIN
+ * de pânico" em vez de estourar. É o estado logo depois do Cryptographic Erase,
+ * que é quando o usuário ainda está na tela de autenticação.
+ */
+describe('estado sem cofre na tela', () => {
+  it('hasPanicPin e panicStatus respondem sem container', () => {
+    const leitura = vi.spyOn(vaultStorage, 'readContainer').mockReturnValue(null);
+    try {
+      expect(hasPanicPin()).toBe(false);
+      expect(panicStatus()).toEqual({ hasPanicPin: false, nukeLimit: 0, attemptsMaster: 0 });
+    } finally {
+      leitura.mockRestore();
+    }
+  });
+
+  it('clearPanicPin devolve o status sem container, em vez de lançar', () => {
+    const leitura = vi.spyOn(vaultStorage, 'readContainer').mockReturnValue(null);
+    try {
+      // não há container para apagar caminho de pânico, e a resposta é o status
+      // de sempre: sem `if (container !== null)`, o `delete` derrubaria a tela
+      expect(() => clearPanicPin()).not.toThrow();
+      expect(clearPanicPin()).toMatchObject({ exists: true });
+    } finally {
+      leitura.mockRestore();
+    }
+  });
 });

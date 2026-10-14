@@ -32,7 +32,12 @@ Camadas:
 - `src/shared/`: regras puras compartilhadas por `main` e `renderer`
   (`@zero/shared`, ex.: avaliação de força de credencial, a Strategy
   `strengthFor`, Base32 e o formato `otpauth://`; sem Node nem DOM).
-- `src/types/`: contratos compartilhados (`@zero/types`, barrel).
+- `src/types/`: contratos compartilhados (`@zero/types`, barrel). É a camada
+  que o preload e o renderer importam: o que atravessa o IPC e o estado de
+  domínio que mais de um módulo do main precisa nomear (`PersistedAuthState`,
+  `FailedAttemptResult`, `TempCleanupResult`). Não é depósito de todo tipo: a
+  forma de um arquivo específico (o `vault.zkv`, um `.zke`) e o detalhe local de
+  um componente ficam com o módulo que os usa, e ver a regra de tipagem abaixo.
 
 ## Arquitetura
 
@@ -114,8 +119,13 @@ Camadas:
 - Barrel exports: `index.ts` só re-exporta. Exceções: os entrypoints
   `src/main/index.ts` e `src/preload/index.ts`, e `src/messages/index.ts`, que
   é o registro de idiomas e a fábrica do bundle.
-- Tipagem de domínio por interfaces/uniões fechadas em `src/types/`
-  (`UnlockKind`, `VaultStatus`), nunca strings soltas.
+- Tipagem de domínio por interfaces/uniões fechadas, nunca strings soltas.
+  Onde o tipo mora depende de quantos módulos precisam nomeá-lo: contrato que
+  atravessa o IPC, ou estado que o main reparte, vai para `src/types/`
+  (`UnlockKind`, `VaultStatus`, `PersistedAuthState`); a forma de um arquivo
+  específico ou de um componente isolado fica com o módulo dono
+  (`container.ts` para o `vault.zkv`, `SelectField.tsx` para as opções do
+  seletor). E nunca duas cópias: se um tipo já existe, importa-se.
 - UI composicional: estado no topo (`App.tsx`), telas e modais controlados
   (`Home`, `EntryModal`, `AuthModal`).
 
@@ -150,7 +160,9 @@ Camadas:
 ## Comandos
 
 - `npm run check`: typecheck + lint + format + `security:audit` (osv-scanner
-  sobre o lockfile, `.osv-scanner.toml`) + `lint:shell` (shellcheck nos
+  sobre o lockfile, com os filtros de `.osv-scanner.toml` e as bandeiras de
+  `--all-vulns`, `--experimental-flag-deprecated-packages` e a allowlist
+  `--licenses`, todas em `package.json`) + `lint:shell` (shellcheck nos
   scripts de `build/scripts/`). Obrigatório antes de concluir qualquer
   mudança. As duas ferramentas ficam em `bin/` e não entram no git:
   `bin/osv-scanner` (copiar de `Chronos/Biblioteca/bin/`) e `bin/shellcheck`
@@ -158,6 +170,12 @@ Camadas:
   que este arquivo descreve: a lista de módulos autorizados a tocar `fs` e a
   proibição de `fs`/`child_process` no renderer e no preload estão em
   `no-restricted-imports`, no `eslint.config.mjs`.
+- Endurecer as ferramentas: uma regra nova só entra depois de rodar contra o
+  repositório inteiro e passar limpa. Regras que só produzem alarme falso aqui
+  ficam de fora, com o motivo escrito ao lado do bloco no `eslint.config.mjs`
+  (`no-nested-ternary`, `no-await-in-loop`, `no-shadow` fora de `src/`). Não
+  desligar regra para o código passar: ou a regra entra e o código se ajusta,
+  ou ela não entra e o motivo fica escrito.
 - `npm test` (ou `test:coverage`): Vitest em `tests/**`.
 - `npm run test:mutation` (ou `test:mutation:plan`): teste de mutação em
   `tools/mutation/`; ver `docs/mutation.md`. É lento (cerca de 90 min) e não

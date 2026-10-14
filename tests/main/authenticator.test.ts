@@ -1,6 +1,7 @@
 // @vitest-environment node
 import fs from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import type * as SharedModule from '@zero/shared';
 import type { AuthToken } from '@zero/types';
 import { authDir, vaultDir } from '@zero/main/layout';
 import {
@@ -17,6 +18,25 @@ import { currentMessages } from '@zero/main/i18n';
 import { vaultStorage } from '@zero/main/facade';
 import { createVault, requireSessionKey } from '@zero/main/vault';
 import { vaultSession } from '@zero/main/session';
+
+/**
+ * `base32Decode` é um binding ESM e não aceita `vi.spyOn`, então o módulo de
+ * `@zero/shared` é substituído por uma casca que delega e registra os Buffers
+ * devolvidos. O registro é o que permite ver o segredo depois do `fill(0)`.
+ */
+const decodificados = vi.hoisted(() => ({ buffers: [] as Uint8Array[] }));
+
+vi.mock('@zero/shared', async (importOriginal) => {
+  const original = await importOriginal<typeof SharedModule>();
+  return {
+    ...original,
+    base32Decode: (texto: string): Uint8Array | null => {
+      const bytes = original.base32Decode(texto);
+      if (bytes !== null) decodificados.buffers.push(bytes);
+      return bytes;
+    },
+  };
+});
 
 const MASTER = 'senha-mestra-guardinha24';
 const PIN = '49201733';
@@ -366,4 +386,50 @@ describe('regras do token que a suíte media mal', () => {
 
 afterAll(() => {
   vi.useRealTimers();
+});
+
+/**
+ * Cryptographic Erase do segredo TOTP. O `fill(0)` é o que impede que os bytes
+ * do segredo continuem num Buffer depois que o código foi calculado, e nenhum
+ * dos dois tinha teste: a suíte conferia o código devolvido, que é o mesmo com
+ * o segredo zerado ou com `0x01` no lugar. O segredo é capturado por referência
+ * no `base32Decode`, então continua observável depois do `fill`.
+ */
+describe('apaga o segredo TOTP da memória', () => {
+  beforeAll(async () => {
+    // o describe anterior já criou o cofre; `createVault` recusa recriar
+    if (!vaultSession().isUnlocked()) {
+      const result = await createVault({
+        masterPassword: MASTER,
+        pin: PIN,
+        recoveryPhrase: PHRASE,
+      });
+      expect(result.ok).toBe(true);
+    }
+  }, 120_000);
+
+  it('apaga os bytes decodificados ao gravar o token', () => {
+    decodificados.buffers.length = 0;
+
+    saveToken(draft({ issuer: 'Zeroiz', account: 'memoria' }));
+
+    expect(decodificados.buffers.length).toBeGreaterThan(0);
+    for (const bytes of decodificados.buffers) {
+      expect(bytes.every((byte) => byte === 0)).toBe(true);
+    }
+  });
+
+  it('apaga os bytes decodificados ao calcular o código', () => {
+    saveToken(draft({ issuer: 'Zeroiz2', account: 'codigo' }));
+    requireSessionKey();
+    decodificados.buffers.length = 0;
+
+    const codes = currentCodes();
+
+    expect(codes.length).toBeGreaterThan(0);
+    expect(decodificados.buffers.length).toBeGreaterThan(0);
+    for (const bytes of decodificados.buffers) {
+      expect(bytes.every((byte) => byte === 0)).toBe(true);
+    }
+  });
 });

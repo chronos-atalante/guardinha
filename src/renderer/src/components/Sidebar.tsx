@@ -2,9 +2,9 @@ import type { JSX } from 'react';
 import { Dices, Film, Key, Lock, Settings, Shield, ShieldAlert, Smartphone } from 'lucide-react';
 import { LanguageSelect } from '@zero/renderer/components/LanguageSelect';
 import { useMessages } from '@zero/renderer/i18n';
-import type { Language } from '@zero/types';
+import type { Language, NavLabelKey, TabType } from '@zero/types';
 
-export type TabType = 'home' | 'generator' | 'authenticator' | 'credits' | 'settings';
+export type { TabType } from '@zero/types';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -16,14 +16,18 @@ interface SidebarProps {
   onDestroy: () => void;
 }
 
-type NavLabelKey = 'home' | 'generator' | 'authenticator' | 'credits' | 'settings';
+/** Uma tela da barra lateral: onde ela leva e com qual ícone ela aparece. */
+interface NavItem {
+  tab: NavLabelKey;
+  icon: typeof Key;
+}
 
-const NAV_ITEMS: { tab: TabType; labelKey: NavLabelKey; icon: typeof Key }[] = [
-  { tab: 'home', labelKey: 'home', icon: Key },
-  { tab: 'generator', labelKey: 'generator', icon: Dices },
-  { tab: 'authenticator', labelKey: 'authenticator', icon: Smartphone },
-  { tab: 'credits', labelKey: 'credits', icon: Film },
-  { tab: 'settings', labelKey: 'settings', icon: Settings },
+const NAV_ITEMS: readonly NavItem[] = [
+  { tab: 'home', icon: Key },
+  { tab: 'generator', icon: Dices },
+  { tab: 'authenticator', icon: Smartphone },
+  { tab: 'credits', icon: Film },
+  { tab: 'settings', icon: Settings },
 ];
 
 export function Sidebar({
@@ -62,7 +66,7 @@ export function Sidebar({
                 }`}
               >
                 <Icon className="w-4 h-4" />
-                {m.app.nav[item.labelKey]}
+                {m.app.nav[item.tab]}
               </button>
             );
           })}

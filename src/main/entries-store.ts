@@ -12,6 +12,7 @@ import {
 import { randomBytes } from '@zero/main/crypto';
 import { SHRED_PASSES, shredFile } from '@zero/main/shred';
 import type { SaltedPayload } from '@zero/main/crypto';
+import type { TempCleanupResult } from '@zero/types';
 
 /**
  * Arquivos individuais das credenciais (`.entries/<uuid>.zke`). Saiu de
@@ -90,7 +91,7 @@ export function deleteEntry(id: string): void {
  * manifesto (`listEntryIds` só lista `.zke`), então sobrevive sem ninguém notar. Os mais velhos que `maxAgeMs` são sobrescritos e apagados; os
  * mais novos são deixados intactos, porque podem ser de uma escrita em curso.
  */
-export function cleanStaleTempFiles(maxAgeMs: number): { removed: number; kept: number } {
+export function cleanStaleTempFiles(maxAgeMs: number): TempCleanupResult {
   const cutoff = Date.now() - maxAgeMs;
   let removed = 0;
   let kept = 0;

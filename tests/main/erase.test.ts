@@ -1,7 +1,8 @@
 // @vitest-environment node
 import fs from 'node:fs';
+import fsExtra from 'fs-extra';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { currentMessages } from '@zero/main/i18n';
 import { eraseVault } from '@zero/main/erase';
 import { clearDestroyedFlag } from '@zero/main/erasure-state';
@@ -225,6 +226,48 @@ describe('varredura de temporários órfãos', () => {
 
     expect(cleanStaleTempFiles(60_000)).toEqual({ removed: 0, kept: 0 });
     expect(fs.existsSync(notVault)).toBe(true);
+  });
+
+  it('apaga o temporário que sumiu no meio da varredura', () => {
+    // Se o `stat` falha, o arquivo já não pode ser lido, e sobra é sobra: a
+    // varredura o tenta apagar de qualquer jeito. Deixar o `stale` como falso
+    // quando o `stat` estoura transformaria um `.tmp` de uma escrita que
+    // morreu em curso num lixo permanente no diretório do cofre.
+    seedVault([]);
+    const somem = path.join(entriesDir(), 'somem.zke.tmp');
+    fs.writeFileSync(somem, 'conteudo', { mode: 0o600 });
+    const original = fsExtra.statSync;
+    const spy = vi.spyOn(fsExtra, 'statSync').mockImplementation((alvo: fs.PathLike) => {
+      if (alvo === somem) throw new Error('sumiu no meio da varredura');
+      return original(alvo);
+    });
+
+    try {
+      expect(cleanStaleTempFiles(60_000)).toEqual({ removed: 1, kept: 0 });
+      expect(fs.existsSync(somem)).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('preserva o temporário que está exatamente no limite de idade', () => {
+    // O corte é `mtime < agora - maxAge`, estrito: um arquivo com a idade exata
+    // do limite ainda pode ser a escrita em curso que o teste quer preservar.
+    seedVault([]);
+    const noLimite = path.join(entriesDir(), 'limite.zke.tmp');
+    fs.writeFileSync(noLimite, 'conteudo', { mode: 0o600 });
+    const agora = Date.now();
+    const exato = new Date(agora - 60_000);
+    fs.utimesSync(noLimite, exato, exato);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(agora);
+    try {
+      expect(cleanStaleTempFiles(60_000)).toEqual({ removed: 0, kept: 1 });
+      expect(fs.existsSync(noLimite)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

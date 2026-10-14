@@ -65,6 +65,19 @@ export interface WrappedMethod {
   payload: SaltedPayload;
 }
 
+/**
+ * Chave do cofre embrulhada por cada credencial (blobs cifrados). Cada
+ * entrada é opcional de propósito: um cofre novo não tem PIN de pânico, e um
+ * cofre que perdeu a senha mestra pode ainda ter a frase de recuperação.
+ */
+export interface VaultMethods {
+  master?: WrappedMethod;
+  pin?: WrappedMethod;
+  recovery?: WrappedMethod;
+  /** PIN de coação: embrulha uma chave decoy, sem relação com a chave real. */
+  panic?: WrappedMethod;
+}
+
 export interface VaultContainerData {
   createdAt: number;
   attempts: number;
@@ -78,15 +91,24 @@ export interface VaultContainerData {
    */
   nukeLimit: number;
   /** Chave do cofre embrulhada por cada credencial (blobs cifrados). */
-  methods: {
-    master?: WrappedMethod;
-    pin?: WrappedMethod;
-    recovery?: WrappedMethod;
-    /** PIN de coação: embrulha uma chave decoy, sem relação com a chave real. */
-    panic?: WrappedMethod;
-  };
+  methods: VaultMethods;
   /** Lista de ids cifrada com a chave do cofre; `null` = ainda não sellada. */
   manifest: SaltedPayload | null;
+}
+
+/** Nome do método de desbloqueio, na ordem em que os flags aparecem no arquivo. */
+export type WrappedMethodName = 'master' | 'pin' | 'recovery' | 'panic';
+
+/** Par do reader de blob: o que leu e onde recomeçar a ler. */
+interface BlobRead {
+  payload: SaltedPayload;
+  next: number;
+}
+
+/** Par do reader de método: o que leu e onde recomeçar a ler. */
+interface MethodRead {
+  method: WrappedMethod;
+  next: number;
 }
 
 function blobBytes(payload: SaltedPayload): number {
@@ -111,7 +133,7 @@ function writeBlob(buffer: Buffer, offset: number, payload: SaltedPayload): numb
   return offset + 52 + text.length;
 }
 
-function readBlob(buffer: Buffer, offset: number): { payload: SaltedPayload; next: number } | null {
+function readBlob(buffer: Buffer, offset: number): BlobRead | null {
   const head = offset + BLOB_HEAD_BYTES;
   if (head > buffer.length) return null;
   const textLength = buffer.readUInt32BE(offset + 48);
@@ -147,11 +169,7 @@ function readKdfAt(buffer: Buffer, offset: number): VaultKdfParams | null {
   return isValidKdfParams(kdf) ? kdf : null;
 }
 
-function readMethodBlob(
-  buffer: Buffer,
-  offset: number,
-  kdf: VaultKdfParams,
-): { method: WrappedMethod; next: number } | null {
+function readMethodBlob(buffer: Buffer, offset: number, kdf: VaultKdfParams): MethodRead | null {
   if (offset + 16 > buffer.length) return null;
   const read = readBlob(buffer, offset + 16);
   if (read === null) return null;
@@ -233,7 +251,7 @@ export function unpackVaultContainer(buffer: Buffer): VaultUnpackResult {
 
   let cursor = HEADER_BYTES;
   const methods: VaultContainerData['methods'] = {};
-  const entries: [number, 'master' | 'pin' | 'recovery' | 'panic'][] = [
+  const entries: [number, WrappedMethodName][] = [
     [FLAG_MASTER, 'master'],
     [FLAG_PIN, 'pin'],
     [FLAG_RECOVERY, 'recovery'],

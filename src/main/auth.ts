@@ -1,7 +1,6 @@
 import { vaultStorage } from '@zero/main/facade';
 import { currentMessages } from '@zero/main/i18n';
-import type { PersistedAuthState } from '@zero/main/facade';
-import type { VaultStatus } from '@zero/types';
+import type { FailedAttemptResult, PersistedAuthState, UnlockKind, VaultStatus } from '@zero/types';
 
 const PENALTY_DELAYS_SECONDS = [10, 30, 60, 3600, 86400] as const; // 10s, 30s, 1m, 1h, 24h
 
@@ -47,10 +46,7 @@ export function getLockRemainingMs(state: PersistedAuthState): number {
  * crossed e precisa destruir. O retorno existe porque o corte da autodestruição
  * mora em `vault.ts` (único lugar que pode apagar o cofre), e não aqui.
  */
-export function registerFailedAttempt(
-  kind: 'master' | 'pin',
-  nukeLimit = 0,
-): { state: PersistedAuthState; crossed: boolean } {
+export function registerFailedAttempt(kind: UnlockKind, nukeLimit = 0): FailedAttemptResult {
   const current = vaultStorage.readAuthState();
   const attempts = current.attempts + 1;
   const attemptsMaster = kind === 'master' ? current.attemptsMaster + 1 : current.attemptsMaster;

@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as ElectronMockModule from '../mocks/electron.ts';
 import type { ElectronApi } from '@zero/types';
 
 /**
@@ -14,7 +15,7 @@ import type { ElectronApi } from '@zero/types';
  * do mock e o preload pegasse outra, todo assert leria `undefined`.
  */
 
-type ElectronMock = typeof import('../mocks/electron.ts');
+type ElectronMock = typeof ElectronMockModule;
 type VaultMethod = keyof ElectronApi['vault'];
 
 interface Loaded {

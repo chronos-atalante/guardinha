@@ -1,5 +1,6 @@
 // @vitest-environment node
 import fs from 'fs-extra';
+import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadSettings, saveSettings } from '@zero/main/settings';
@@ -94,10 +95,30 @@ describe('loadSettings', () => {
   });
 
   it('cai no XDG do HOME quando XDG_CONFIG_HOME não está definido', () => {
+    // O caminho tem de ser o do HOME de verdade, conferido no disco: montar a
+    // mesma string aqui e conferir a string não mede o código, mede o teste.
     delete process.env.XDG_CONFIG_HOME;
-    const expected = path.join(process.env.HOME ?? '', '.config', 'guardinha', 'settings.json');
-    expect(loadSettings()).toEqual({ language: 'pt-BR' });
-    expect(path.normalize(expected)).toContain(path.join('.config', 'guardinha'));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), TEMP_PREFIX));
+    const previous = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      saveSettings({ language: 'en' });
+
+      expect(fs.existsSync(path.join(home, '.config', 'guardinha', 'settings.json'))).toBe(true);
+      expect(loadSettings()).toEqual({ language: 'en' });
+    } finally {
+      if (previous === undefined) delete process.env.HOME;
+      else process.env.HOME = previous;
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('grava o JSON com indentação de dois espaços', () => {
+    // O arquivo é do app, mas ele é lido por olho quando alguém vai depurar o
+    // idioma; a forma em disco é contrato, não detalhe de formatação.
+    saveSettings({ language: 'pt-BR' });
+
+    expect(fs.readFileSync(file(), 'utf8')).toBe('{\n  "language": "pt-BR"\n}');
   });
 
   it('ignora XDG_CONFIG_HOME vazio, como se não estivesse definido', () => {

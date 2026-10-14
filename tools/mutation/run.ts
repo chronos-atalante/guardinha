@@ -651,7 +651,7 @@ function printSummary(
   process.stdout.write(`\nscore de mutação: ${score.toFixed(1)}%\n\n`);
 
   process.stdout.write('por operador\n');
-  for (const [operator, bucket] of [...byOperator].sort()) {
+  for (const [operator, bucket] of [...byOperator].sort(([a], [b]) => a.localeCompare(b))) {
     const total = bucket.killed + bucket.survived;
     const pct = total === 0 ? 0 : Math.round((bucket.killed / total) * 100);
     process.stdout.write(`  ${operator.padEnd(20)} ${pct}%  ${bucket.killed}/${total}\n`);

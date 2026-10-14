@@ -54,6 +54,30 @@ export interface PanicPinInput {
 }
 
 /**
+ * Estado da trava exponencial como ele fica gravado no `vault.zkv`.
+ *
+ * Mora aqui, e não em `src/main/storage.ts`, porque não é detalhe do arquivo:
+ * `auth.ts` (que calcula a trava), `vault.ts`, `unlock.ts` e a fachada
+ * repartem esse estado, e `FailedAttemptResult` abaixo o expõe. Declarar aqui
+ * mantém `src/types/` sem depender de `src/main/`, que é a direção correta da
+ * dependência.
+ */
+export interface PersistedAuthState {
+  attempts: number;
+  lockUntil: number | null;
+  /** Falhas só da senha mestra; o PIN não soma aqui. */
+  attemptsMaster: number;
+  /** Limite estrito da senha mestra; `0` = autodestruição desligada. */
+  nukeLimit: number;
+}
+
+/** Estado novo da trava e se ele já cruzou o limite de autodestruição. */
+export interface FailedAttemptResult {
+  state: PersistedAuthState;
+  crossed: boolean;
+}
+
+/**
  * Estado das proteções de pânico do cofre. `hasPanicPin` diz se existe um
  * caminho de coação instalado; `nukeLimit` é o teto de tentativas da senha
  * mestra, com `0` significando desligado (que é o padrão).
@@ -79,4 +103,14 @@ export interface VaultResult {
 export interface EraseResult {
   shredded: number;
   failed: number;
+}
+
+/**
+ * Varredura de temporários órfãos: quantos `.tmp` foram sobrescritos e apagados,
+ * e quantos foram deixados intactos por ainda poderem ser de uma escrita em
+ * curso. Irmão de `EraseResult`, e pelo mesmo motivo mora aqui.
+ */
+export interface TempCleanupResult {
+  removed: number;
+  kept: number;
 }

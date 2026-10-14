@@ -110,3 +110,17 @@ describe('StrengthMeter', () => {
     expect(container.textContent).not.toContain('undefined');
   });
 });
+
+describe('a linha de motivos é condicional de verdade', () => {
+  it('sem motivo e sem dica, o componente não deixa nenhum parágrafo para trás', () => {
+    // A linha dos motivos só existe quando há motivo. Renderizá-la vazia
+    // deixaria um parágrafo sem texto na tela, que é o que o `> 0` evita.
+    const { container } = render(
+      <MessagesProvider language="pt-BR">
+        <StrengthMeter result={result({ score: 4, reasons: [] })} />
+      </MessagesProvider>,
+    );
+
+    expect(container.querySelectorAll('p')).toHaveLength(0);
+  });
+});

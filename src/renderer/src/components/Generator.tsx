@@ -11,6 +11,13 @@ interface GeneratorProps {
   onToast: (message: string) => void;
 }
 
+/** Um interruptor de categoria do gerador: o que ele marca e o texto dele. */
+interface CharacterToggle {
+  checked: boolean;
+  set: (value: boolean) => void;
+  label: string;
+}
+
 export function Generator({ onToast }: GeneratorProps): JSX.Element {
   const m = useMessages();
   const [length, setLength] = useState<number>(24);
@@ -56,7 +63,7 @@ export function Generator({ onToast }: GeneratorProps): JSX.Element {
     }
   };
 
-  const toggles: { checked: boolean; set: (value: boolean) => void; label: string }[] = [
+  const toggles: CharacterToggle[] = [
     { checked: useUpper, set: setUseUpper, label: m.generator.upper },
     { checked: useLower, set: setUseLower, label: m.generator.lower },
     { checked: useNumbers, set: setUseNumbers, label: m.generator.numbers },

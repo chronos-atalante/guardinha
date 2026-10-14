@@ -20,6 +20,8 @@ export interface Draft {
 export interface OperatorContext {
   code: string;
   drafts: Draft[];
+  /** Recortes de literais que só valem para aparência (dentro de `className`). */
+  presentation: ReadonlySet<number>;
 }
 
 type Handler = (node: Node, parent: Node | null, context: OperatorContext) => void;
@@ -216,18 +218,50 @@ const numericLiteral: Handler = (node, parent, context) => {
   context.drafts.push({ operator: 'numeric', start, end, replacement: String(value + 1) });
 };
 
+/**
+ * Atributo de JSX que é casca visual, não decisão. `className` é a lista de
+ * classes do Tailwind, e `type`, `autoComplete`, `inputMode` e `size` são
+ * metadados de formulário que o app não usa para decidir nada (não há `<form>`
+ * no renderer, então `type="button"` é puro boilerplate). Trocar uma dessas
+ * strings produz um mutante que a suíte só mata se passar a verificar classe de
+ * CSS, que é testar a folha de estilo e não o comportamento.
+ */
+const PRESENTATIONAL_JSX_ATTRIBUTES = new Set([
+  'className',
+  'type',
+  'autoComplete',
+  'inputMode',
+  'size',
+  'role',
+]);
+
+function isPresentationalJsxAttribute(parent: Node | null): boolean {
+  if (parent?.type !== 'JSXAttribute') return false;
+  const name = (parent as unknown as { name: { name?: unknown } }).name.name;
+  return typeof name === 'string' && PRESENTATIONAL_JSX_ATTRIBUTES.has(name);
+}
+
 const stringLiteral: Handler = (node, parent, context) => {
-  const self = node as unknown as { value: string };
+  const self = node as unknown as { value: string; start?: number };
   if (self.value === '') return;
   if (parent === null) return;
   if (isTypePosition(parent) || isModuleSpecifier(parent, node)) return;
-  if (isDataTableElement(parent)) return;
+  if (isDataTableElement(parent) || isPresentationalJsxAttribute(parent)) return;
+  if (typeof self.start === 'number' && context.presentation.has(self.start)) return;
   const { start, end } = spanOf(node);
   context.drafts.push({ operator: 'string-empty', start, end, replacement: "''" });
 };
 
+/**
+ * `a?.b` → `a.b`. Só o nó que carrega o `?.` de verdade vira mutante: em
+ * `a?.b.c` o Babel aninha um segundo `OptionalMemberExpression` para o `.c`, com
+ * `optional: false`. Sem esta checagem, esse nó geraria um mutante que troca
+ * `.` por `.`, que é o mesmo texto e não muda nada: um sobrevivente que não
+ * significa buraco nenhum.
+ */
 const optionalMemberExpression: Handler = (node, _parent, context) => {
-  const self = node as unknown as { object: Node; property: Node };
+  const self = node as unknown as { object: Node; property: Node; optional: boolean };
+  if (!self.optional) return;
   const start = spanOf(self.object).end;
   const end = spanOf(self.property).start;
   if (end <= start) return;

@@ -15,6 +15,11 @@ function resetMocks(): void {
   app.commandLine.hasSwitch.mockReset().mockReturnValue(false);
 }
 
+/** Só o switch que o app usa responde `true`, e o resto responde `false`. */
+function soComLogLevel(): void {
+  app.commandLine.hasSwitch.mockImplementation((name: string) => name === 'log-level');
+}
+
 describe('log do Chromium', () => {
   it('rebaixa o log nativo para só FATAL', () => {
     resetMocks();
@@ -25,12 +30,24 @@ describe('log do Chromium', () => {
   });
 
   it('respeita o --log-level que veio na linha de comando', () => {
+    // A resposta do mock depende do nome pedido: com `true` para qualquer switch,
+    // um `hasSwitch('')` passaria igual e o mutante do nome sobreviveria.
     resetMocks();
-    app.commandLine.hasSwitch.mockReturnValue(true);
+    soComLogLevel();
 
     quietChromiumLog();
 
     // quem chamou com `--log-level=0` está depurando de propósito
     expect(app.commandLine.appendSwitch).not.toHaveBeenCalled();
+  });
+
+  it('pergunta pelo switch pelo nome, e não por qualquer switch', () => {
+    // Um app com outro switch na linha de comando não pode calar o log por
+    // acidente: o `hasSwitch` é chamado com o nome certo.
+    resetMocks();
+
+    quietChromiumLog();
+
+    expect(app.commandLine.hasSwitch).toHaveBeenCalledWith('log-level');
   });
 });

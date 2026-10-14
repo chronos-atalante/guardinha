@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import App from '@zero/renderer/App';
@@ -119,5 +119,36 @@ describe('botão de autodestruição', () => {
 
     await user.click(screen.getByRole('button', { name: /Cancelar/i }));
     expect(destroy).not.toHaveBeenCalled();
+  });
+});
+
+describe('a tela de autodestruição só existe quando o usuário pede', () => {
+  it('não abre sozinha com o cofre já aberto', async () => {
+    // `confirmDestroy` nasce falso: se nascesse verdadeiro, o app abriria pedindo
+    // a palavra de confirmação de uma autodestruição que ninguém pediu.
+    installApi({ status: UNLOCKED });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Senhas' });
+
+    expect(screen.queryByLabelText(/Digite a palavra/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Destruir cofre/i })).not.toBeInTheDocument();
+  });
+
+  it('cancelar fecha a tela, e não deixa a confirmação pendurada', async () => {
+    const user = userEvent.setup();
+    const api = installApi({ status: UNLOCKED });
+    api.vault.destroy = vi.fn(() => Promise.resolve({ ...UNLOCKED, exists: false }));
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: /Autodestruição/i }));
+    await screen.findByRole('button', { name: /Destruir cofre/i });
+    await user.click(screen.getByRole('button', { name: /Cancelar/i }));
+
+    // o `setConfirmDestroy(false)` do cancelamento é o que tira a tela; sem ele
+    // a tela de confirmação ficaria na tela com o botão de ação habilitado
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /Destruir cofre/i })).not.toBeInTheDocument();
+    });
+    expect(api.vault.destroy).not.toHaveBeenCalled();
   });
 });

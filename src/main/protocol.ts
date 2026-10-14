@@ -144,12 +144,24 @@ function isAppFrameUrl(url: string | undefined): boolean {
 }
 
 /**
+ * O pedaço do evento do IPC que a guarda precisa: o frame que o emitiu e a URL
+ * dele. Nomeado em vez de escrito na hora porque a forma aninhada e toda
+ * opcional (`senderFrame` pode não existir) é justamente o tipo de coisa que
+ * se esquece de conferir e vira `undefined` silencioso.
+ */
+interface FrameEmitter {
+  senderFrame?: { url?: unknown } | null;
+}
+
+/**
  * Recusa IPC cujo emissor não é a página oficial do app (scheme `guardinha://`
  * em produção ou dev server do Vite em dev). Requer `event.senderFrame`.
  */
 export function assertAppFrame(event: unknown): void {
-  const sf = (event as { senderFrame?: { url?: unknown } | null } | null | undefined)?.senderFrame;
-  const url = sf?.url;
+  if (typeof event !== 'object' || event === null) {
+    throw new Error('IPC bloqueado: frame fora da página oficial do app.');
+  }
+  const url = (event as FrameEmitter).senderFrame?.url;
   if (!isAppFrameUrl(typeof url === 'string' ? url : undefined)) {
     throw new Error('IPC bloqueado: frame fora da página oficial do app.');
   }

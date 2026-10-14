@@ -37,7 +37,7 @@ export function writeSecretFile(file: string, data: Buffer | string): void {
 
 export function isPermissionError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
-  const code = (error as { code?: unknown }).code;
+  const code = (error as NodeJS.ErrnoException).code;
   return code === 'EACCES' || code === 'EPERM' || code === 'EROFS';
 }
 
