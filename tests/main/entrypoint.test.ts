@@ -401,4 +401,28 @@ describe('aviso de sessão perdida', () => {
 
     expect(BOOT_WINDOW.webContents.send).not.toHaveBeenCalled();
   });
+
+  it('erro de domínio também não empurra o aviso de sessão', () => {
+    // `entries:save` passa por `withSessionNotice`, mas o erro é de credencial
+    // inválida, não de sessão perdida. Sem o filtro do `isVaultLockedError`, a
+    // tela saltaria para a autenticação por causa de um título em branco.
+    if (BOOT_WINDOW === undefined) throw new Error('nenhuma janela criada no boot');
+    vaultSession().adopt(Buffer.alloc(32, 1));
+    BOOT_WINDOW.webContents.send.mockClear();
+
+    try {
+      expect(() =>
+        call('entries:save', appFrame(), {
+          title: '   ',
+          username: '',
+          password: '',
+          domain: '',
+          notes: '',
+        }),
+      ).toThrow(currentMessages().errors.invalidTitle);
+      expect(BOOT_WINDOW.webContents.send).not.toHaveBeenCalled();
+    } finally {
+      vaultSession().wipe();
+    }
+  });
 });

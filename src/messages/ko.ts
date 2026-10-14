@@ -31,6 +31,7 @@ export const ko: Messages = {
     name: 'Guardinha',
     subtitle: 'Otaku Delirante',
     statusLocal: '100% 로컬 / 암호화됨',
+    statusLabel: '상태:',
     nav: {
       home: '홈 (비밀번호)',
       generator: '비밀번호 생성기',
@@ -327,5 +328,13 @@ export const ko: Messages = {
       '설정 키는 올바른 Base32(A-Z 및 2-7)여야 하며 128비트(16바이트) 이상이어야 합니다.',
     authTokenNotFound: '2FA 토큰을 찾을 수 없습니다.',
     internal: '금고 내부 오류.',
+    /** Guarda de origem do IPC: o emissor não é a página oficial do app. */
+    foreignFrame: 'IPC 차단: 요청이 앱 페이지에서 오지 않았습니다.',
+    containerCorrupted: '손상된 금고 레코드입니다.',
+    invalidManifest: '무결성 매니페스트가 잘못되었습니다.',
+    invalidKdfParams: 'KDF 파라미터가 잘못되었습니다.',
+    unknownUnlockMethod: (kind: string): string => `알 수 없는 잠금 해제 방식: ${kind}`,
+    truncatedDigest: 'HMAC 다이제스트가 잘렸습니다.',
+    shortPhrase: '복구 구문구가 너무 짧습니다.',
   },
 };

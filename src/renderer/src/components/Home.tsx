@@ -3,15 +3,13 @@ import type { JSX } from 'react';
 import { Copy, Globe, KeyRound, Pencil, Plus, Search, User } from 'lucide-react';
 import { useMessages } from '@zero/renderer/i18n';
 import { copyAndAutoClear } from '@zero/renderer/clipboard';
+import { errorMessage } from '@zero/shared';
+import { useLatest } from '@zero/renderer/hooks';
 import { EntryModal } from '@zero/renderer/components/EntryModal';
 import type { Credential } from '@zero/types';
 
 interface HomeProps {
   onToast: (message: string) => void;
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message !== '' ? error.message : fallback;
 }
 
 export function Home({ onToast }: HomeProps): JSX.Element {
@@ -22,14 +20,18 @@ export function Home({ onToast }: HomeProps): JSX.Element {
   const [modalOpen, setModalOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // fora das dependências: recarregar a lista a cada troca de idioma seria
+  // buscar de novo por causa de um texto de erro que talvez nem apareça
+  const internalError = useLatest(m.errors.internal);
+
   const reload = useCallback(async (): Promise<void> => {
     try {
       setEntries(await window.api.entries.list());
       setLoadError(null);
     } catch (caught) {
-      setLoadError(errorMessage(caught, m.errors.internal));
+      setLoadError(errorMessage(caught, internalError.current));
     }
-  }, [m.errors.internal]);
+  }, [internalError]);
 
   useEffect(() => {
     void reload();

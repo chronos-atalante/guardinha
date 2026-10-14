@@ -18,7 +18,7 @@ import {
 } from '@zero/main/vault';
 import { readAuthState, writeAuthState } from '@zero/main/storage';
 import { containerFile } from '@zero/main/layout';
-import type { PersistedAuthState } from '@zero/main/storage';
+import type { PersistedAuthState } from '@zero/types';
 
 /**
  * Ramas de decisão do cofre que os testes de fluxo não alcançam: estados

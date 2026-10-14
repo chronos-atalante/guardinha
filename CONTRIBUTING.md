@@ -78,12 +78,19 @@ entrada. Mudanças voltadas ao usuário ganham entrada em
   podem ecoar nenhum dos três (regra do `AGENTS.md`).
 - Vulnerabilidades de dependências: rode `npm run security:audit`; ignores só
   com justificativa e data de revisão em `.osv-scanner.toml`.
+- Licença de dependência: o mesmo comando barra licença copyleft (GPL, AGPL,
+  SSPL, BUSL) e pacote sem licença declarada. Licença nova que aparecer é pedido
+  de revisão, não defeito: leia a licença e acrescente à allowlist em
+  `scripts.security:audit` (`package.json`), com o motivo em
+  `.osv-scanner.toml`. Confira antes se o pacote vai mesmo para o `.deb` ou se
+  é só de build.
 - Scripts de shell: `npm run lint:shell` no `check` cobre `build/scripts/`.
 - Achou uma falha? **Não abra issue pública**: siga [`SECURITY.md`](SECURITY.md).
 
 ## 8. Enviar a mudança
 
-1. Crie um branch a partir da `main`: `git checkout -b minha-mudanca`.
+1. Crie um branch a partir da `developer` (é a integração com a `main` que
+   publica): `git checkout -b minha-mudanca developer`.
 2. Faça commits pequenos, com mensagens claras em pt-BR.
 3. Rode `npm run check` e `npm test` (tudo verde).
 4. Abra o PR pelo formulário do repositório (`.github/pull_request_template.md`),

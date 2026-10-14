@@ -78,7 +78,7 @@ describe('HOTP (RFC 4226)', () => {
     vi.spyOn(hmac, 'digest').mockReturnValue(Buffer.alloc(0) as unknown as string);
     vi.spyOn(crypto, 'createHmac').mockReturnValue(hmac);
 
-    expect(() => hotp(SEED_SHA1, 0, 6, 'SHA1')).toThrow('digest HMAC truncado');
+    expect(() => hotp(SEED_SHA1, 0, 6, 'SHA1')).toThrow('Digest HMAC truncado.');
   });
 });
 

@@ -16,7 +16,3 @@ export function normalizePhrase(text: string): string {
     .filter((word) => word !== '')
     .join(' ');
 }
-
-export function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message !== '' ? error.message : fallback;
-}

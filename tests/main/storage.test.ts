@@ -16,6 +16,7 @@ import {
 } from '@zero/main/entries-store';
 import { ensureVaultStructure } from '@zero/main/structure';
 import {
+  initManifest,
   readVaultContainer,
   vaultExists,
   verifyManifest,
@@ -204,11 +205,18 @@ describe('a varredura ignora o que não é credencial', () => {
     fs.writeFileSync(path.join(entries, 'escrito-vez.zke.tmp'), 'meio de escrita');
     fs.writeFileSync(path.join(entries, 'notas.txt'), 'anotacao');
 
-    const ids = listEntryIds();
+    // A lista é exatamente o que está em disco com a extensão da credencial, e
+    // nada mais: conferir só que o nome esperado não apareceu deixaria passar
+    // um id tirado do nome errado.
+    const noDisco = fs
+      .readdirSync(entries)
+      .filter((name) => name.endsWith('.zke'))
+      .map((name) => name.slice(0, -'.zke'.length))
+      .sort();
+    const ids = [...listEntryIds()].sort();
 
     expect(ids).toContain(ENTRY_ID);
-    expect(ids).not.toContain('escrito-vez.zke');
-    expect(ids).not.toContain('notas');
+    expect(ids).toEqual(noDisco);
   });
 
   it('id bem formado cujo arquivo sumiu dá erro de credencial inexistente', () => {
@@ -250,5 +258,41 @@ describe('verifyManifest com o arquivo fora do esperado', () => {
     } finally {
       fs.writeFileSync(arquivo, backup);
     }
+  });
+
+  it('selar o manifesto sem cofre não é erro, é não ter o que selar', () => {
+    // O `initManifest` roda a cada desbloqueio e logo depois de criar o cofre. Um
+    // cofre que não existe não é um erro de aplicação: o código devolve calado,
+    // e sem a guarda o `data.manifest` derrubaria a exceção por cima da tela de
+    // autenticação.
+    const arquivo = containerFile();
+    const backup = fs.readFileSync(arquivo);
+    fs.rmSync(arquivo, { force: true });
+    try {
+      expect(() => initManifest(Buffer.alloc(32, 7))).not.toThrow();
+      expect(fs.existsSync(arquivo)).toBe(false);
+    } finally {
+      fs.writeFileSync(arquivo, backup);
+    }
+  });
+
+  it('só sela o manifesto uma vez: re-selar apagaria a defesa', () => {
+    // O manifesto é a linha de base do cofre. Se `initManifest` re-selasse a cada
+    // chamada, o desbloqueio seguinte adotaria como normale um `.zke` plantado
+    // por fora, e o arquivo adulterado passaria despercebido.
+    const chave = Buffer.alloc(32, 3);
+    const data = container();
+    data.manifest = sealManifest(chave, [], []);
+    writeVaultContainer(data);
+    const antes = readVaultContainer()?.manifest;
+
+    writeEntryPayload('cccccccc-bbbb-4ccc-8ddd-eeeeeeeeeeee', ENTRY_PAYLOAD);
+    initManifest(chave);
+
+    expect(readVaultContainer()?.manifest).toEqual(antes);
+    expect(() => verifyManifest(chave)).toThrow(currentMessages().errors.vaultTampered);
+    fs.rmSync(path.join(targetVaultDir(), '.entries', 'cccccccc-bbbb-4ccc-8ddd-eeeeeeeeeeee.zke'), {
+      force: true,
+    });
   });
 });

@@ -8,6 +8,7 @@
 | 1.5.x  | ✅ Correções ativas |
 | 1.4.x  | ✅ Correções ativas |
 | 1.3.x  | ✅ Correções ativas |
+| 1.2.x  | ✅ Correções ativas |
 | 1.1.x  | ✅ Correções ativas |
 
 Versões anteriores ao 1.0.0 não recebem correções; atualize pelo `.deb` mais

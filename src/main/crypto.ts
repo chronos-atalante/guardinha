@@ -52,11 +52,6 @@ export function isValidKdfParams(value: unknown): value is Argon2Params {
   );
 }
 
-export const MASTER_PASSWORD_LENGTH = 24;
-export const PIN_LENGTH = 8;
-/** Número mínimo de palavras da frase de recuperação (escrita pelo usuário). */
-export const RECOVERY_MIN_WORDS = 12;
-
 export interface EncryptedPayload {
   iv: string;
   tag: string;

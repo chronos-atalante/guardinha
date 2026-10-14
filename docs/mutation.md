@@ -76,9 +76,16 @@ entradas (`LEVELS`, `COMMON_WORDS`, `OTP_ALGORITHMS`): mutar uma entrada mede se
 a suíte confere item por item o conjunto que o código carrega, e não se o código
 que consome o conjunto funciona.
 
+Nem mexe em atributo de JSX de apresentação (`className`, `type`,
+`autoComplete`, `inputMode`, `size`, `role`) nem em literal aninhado dentro do
+valor de um `className`, por mais fundo que esteja (`cond ? 'a' : 'b'`, tabela
+de constantes). Uma lista de classes do Tailwind é folha de estilo, não
+decisão: matar esse mutante exigiria que a suíte conferisse o texto da classe,
+que é testar o CSS e medir o componente por uma coisa que ele não decide.
+
 ## Como a varredura fica barata
 
-Uma execução da suíte inteira custa 84 s. Multiplicada por 2.560 mutantes, a
+Uma execução da suíte inteira custa 84 s. Multiplicada por 2.557 mutantes, a
 varredura seria de dias. O que reduz isso:
 
 - **Seleção por linha.** Uma matriz arquivo de teste → linhas de `src/`
@@ -103,6 +110,18 @@ varredura seria de dias. O que reduz isso:
   é tudo que `tests/main/crypto.test.ts` verifica, e some em microssegundos. O
   stub só existe na varredura; o `npm test` continua usando o Argon2id de
   verdade, e nenhum teste compara a saída com um vetor do Argon2id.
+- **O doppelgänger não pode ser mais permissivo que a biblioteca.** O `hash-wasm`
+  de verdade lança `Insupported output type` para qualquer `outputType` fora de
+  `hex`, `binary` e `encoded`, e o stub faz o mesmo. Sem essa fidelidade, o
+  `outputType: 'hex'` de `deriveKey` sobrevivia à varredura inteiro: o mutante
+  trocado por `''` não mudava nada no doppelgänger, e a suíte via verde com um
+  `crypto.ts` que a biblioteca real rejeitaria. É o mesmo princípio do teste
+  de baseline, aplicado à fronteira de um módulo: um substituto mais tolerante
+  esconde o mutante.
+- **O `optional-chaining` só mexe no `?.` de verdade.** Em `a?.b.c` o Babel
+  aninha um segundo `OptionalMemberExpression` para o `.c`, com `optional:
+false`. Sem a checagem, esse nó gerava um mutante que troca `.` por `.`, que é
+  o mesmo texto: um sobrevivente que não é buraco de teste, é ruído.
 
 ## Garantias
 
@@ -143,7 +162,7 @@ do resto do workflow:
 Ela **não** roda em pull request nem em push para a `main`. A varredura leva
 horas e o número que ela mede só muda quando alguém escreve teste novo; a única
 coisa que ela faz por um PR é mudar de verde para vermelho sem dizer nada sobre o
-PR. Reprova abaixo de **65%**, com o número medido hoje em 70,2%.
+PR. Reprova abaixo de **65%**, com o número medido hoje em 69,4%.
 
 | Input           | Efeito                                                      |
 | --------------- | ----------------------------------------------------------- |
@@ -184,6 +203,7 @@ nada.
 | `tools/mutation/coverage.ts`       | Leitura do relatório do v8 e filtro de linha alcançada.         |
 | `tools/mutation/plugin.ts`         | Plugin do Vite que injeta o mutante no módulo alvo.             |
 | `tools/mutation/scope.ts`          | O que entra e o que sai, com o motivo de cada exclusão.         |
+| `tools/mutation/types.ts`          | O veredito do mutante e o formato do resultado gravado.         |
 | `tools/mutation/hash-wasm-stub.ts` | Doppelgänger barato do Argon2id para a varredura.               |
 | `vitest.mutation.config.mts`       | Config de Vitest da varredura.                                  |
 
@@ -282,6 +302,36 @@ achados que valem registro:
 - `entries.ts` ordenava a lista por `b.updatedAt - a.updatedAt`, e a suíte só
   conferia que as ids estavam na lista, nunca a ordem.
 - `shred.ts` sobrescrevia com 3 passadas sem teste que conferisse o número.
+
+### A segunda leva: `crypto.ts` e `unlock.ts`
+
+Depois de mover a política de credencial para `@zero/shared`, `src/main/crypto.ts`
+subiu de 83,9% para 91% e `src/main/unlock.ts` de 77,8% para 92,6%. O que a
+varredura pegou:
+
+- **O `fill(0)` da chave derivada não tinha teste nenhum.** Em `crypto.ts` e em
+  `unlock.ts`, um `fill(1)` é mutante que sobrevivia porque a suíte só conferia
+  o resultado da chamada, e o resultado é idêntico com a chave zerada ou com a
+  chave `0x01` no lugar. Agora o Buffer é capturado por referência no
+  `createCipheriv` e conferido depois do retorno.
+- **Os rótulos de domínio do HKDF eram testados, mas não o valor.** O teste
+  antigo fixava que entrada e token de 2FA não dividem chave, e isso continua
+  valendo com um dos rótulos vazio, porque os dois lados ainda divergem. O que
+  se perdia era o contrato com o disco: trocar o rótulo invalida todo `.zke` e
+  todo `.zka` que o usuário já tinha. O teste novo refaz o HKDF à mão, com o
+  rótulo escrito por extenso.
+- **O validador de formato do PIN não provava que a derivação não rodava.** O
+  teste existia, mas media só a resposta, e a resposta é a mesma com o validador
+  removido, só que um Argon2id mais caro. E medir o tempo não fecha o buraco,
+  porque o doppelgänger da varredura deriva em microssegundos. O que separa as
+  duas coisas é a chamada que não aconteceu: agora o teste afirma que `derive`
+  não foi invocado para um PIN malformado.
+
+Ficaram dois sobreviventes em `unlock.ts` que são **equivalentes de verdade**, no
+mesmo sentido dos de `shred.ts`: `if (remaining <= 0)` virando `< 1` não muda nada
+porque `remaining` é inteiro; e o `||` do manipulador de integridade virando `&&`
+não muda nada porque o manipulador de KDF, que vem antes na cadeia, garante que os
+dois operandos existem quando ele roda. São defesas inalcançáveis, não buracos.
 
 O padrão é sempre o mesmo: o teste antigo cobria o caminho feliz e o código tem
 ramas de borda que ninguém exercita. É o que a mutação enxerga e a cobertura de

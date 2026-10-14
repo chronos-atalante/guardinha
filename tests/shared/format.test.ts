@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCountdown } from '@zero/shared/format';
+import { errorMessage, formatCountdown } from '@zero/shared/format';
 
 /**
  * A contagem regressiva é o que a tela mostra enquanto o cofre está na trava
@@ -32,5 +32,22 @@ describe('formatCountdown', () => {
     expect(formatCountdown(120_000)).toBe('2:00');
     expect(formatCountdown(3_600_000)).toBe('60:00');
     expect(formatCountdown(86_400_000)).toBe('1440:00');
+  });
+});
+
+describe('errorMessage', () => {
+  it('usa a mensagem do erro quando ela existe', () => {
+    expect(errorMessage(new Error('Cofre bloqueado.'), 'padrão')).toBe('Cofre bloqueado.');
+  });
+
+  it('cai no padrão quando a mensagem do erro está vazia', () => {
+    expect(errorMessage(new Error(''), 'padrão')).toBe('padrão');
+  });
+
+  it('cai no padrão quando não é Error, como a rejeição de IPC crua', () => {
+    expect(errorMessage('texto solto', 'padrão')).toBe('padrão');
+    expect(errorMessage(undefined, 'padrão')).toBe('padrão');
+    expect(errorMessage(null, 'padrão')).toBe('padrão');
+    expect(errorMessage({ message: 'objeto' }, 'padrão')).toBe('padrão');
   });
 });

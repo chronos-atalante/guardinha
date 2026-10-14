@@ -46,9 +46,10 @@ describe('node.loader (aliases @zero/* para .ts direto)', () => {
 
   it('resolve um alias sem extensão', () => {
     const out = runWithLoader(
-      `import { PIN_LENGTH } from '@zero/main/crypto';\nconsole.log(PIN_LENGTH);`,
+      `import { normalizeRecoveryPhrase } from '@zero/main/crypto';\n` +
+        `console.log(normalizeRecoveryPhrase('  Abelha\tAGUA  alface '));`,
     );
-    expect(out).toBe('8');
+    expect(out).toBe('abelha agua alface');
   });
 
   it('resolve o índice do pacote quando o alias aponta para a pasta', () => {

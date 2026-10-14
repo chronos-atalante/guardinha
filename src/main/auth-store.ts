@@ -3,7 +3,7 @@ import path from 'node:path';
 import { packEntryPayload, unpackEntryPayload } from '@zero/main/container';
 import { currentMessages } from '@zero/main/i18n';
 import { authDir } from '@zero/main/layout';
-import { ensureVaultStructure } from '@zero/main/structure';
+import { ensureVaultStructure, writeSecretFile } from '@zero/main/structure';
 import { SHRED_PASSES, shredFile } from '@zero/main/shred';
 import type { SaltedPayload } from '@zero/main/crypto';
 
@@ -54,15 +54,11 @@ export function readAuthPayload(id: string): SaltedPayload {
   return payload;
 }
 
-/** Grava de forma atômica (`.tmp` + `rename`), em 0600, como as credenciais. */
+/** Grava de forma atômica, em 0600, como as credenciais. */
 export function writeAuthPayload(id: string, payload: SaltedPayload): void {
   assertSafeAuthId(id);
   ensureVaultStructure();
-  const file = authFile(id);
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, packEntryPayload(payload), { mode: 0o600 });
-  fs.renameSync(tmp, file);
-  fs.chmodSync(file, 0o600);
+  writeSecretFile(authFile(id), packEntryPayload(payload));
 }
 
 /**

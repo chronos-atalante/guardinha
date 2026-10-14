@@ -29,6 +29,13 @@ const KEY_DELTAS: Record<string, number> = {
   PageDown: -10,
 };
 
+/** Arraste em curso: onde o ponteiro pegou, o valor de então e o passo em px. */
+interface DragState {
+  startX: number;
+  startValue: number;
+  stepPx: number;
+}
+
 export function SensitivitySlider({
   value,
   min,
@@ -37,7 +44,7 @@ export function SensitivitySlider({
   onChange,
 }: SensitivitySliderProps): JSX.Element {
   const trackRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ startX: number; startValue: number; stepPx: number } | null>(null);
+  const dragRef = useRef<DragState | null>(null);
 
   const stepPx = useCallback((): number => {
     const width = trackRef.current?.clientWidth ?? 480;

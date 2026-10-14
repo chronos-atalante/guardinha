@@ -4,7 +4,16 @@ import { X } from 'lucide-react';
 import { richText, useMessages } from '@zero/renderer/i18n';
 import { SelectField } from '@zero/renderer/components/SelectField';
 import type { SelectOption } from '@zero/renderer/components/SelectField';
-import { OTP_ALGORITHMS, OTP_DIGIT_CHOICES, OTP_PERIOD_RANGE, parseOtpAuthUri } from '@zero/shared';
+import {
+  errorMessage,
+  OTP_ALGORITHMS,
+  OTP_DEFAULT_ALGORITHM,
+  OTP_DEFAULT_DIGITS,
+  OTP_DEFAULT_PERIOD,
+  OTP_DIGIT_CHOICES,
+  OTP_PERIOD_RANGE,
+  parseOtpAuthUri,
+} from '@zero/shared';
 import type { OtpAlgorithm } from '@zero/shared';
 import type { AuthToken, AuthTokenDraft } from '@zero/types';
 
@@ -28,10 +37,6 @@ interface AuthTokenModalProps {
   onClose: () => void;
   onSaved: () => void;
   onError: (message: string) => void;
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message !== '' ? error.message : fallback;
 }
 
 const ALGORITHM_OPTIONS: readonly SelectOption<OtpAlgorithm>[] = OTP_ALGORITHMS.map((value) => ({
@@ -58,9 +63,11 @@ export function AuthTokenModal({
   const [secret, setSecret] = useState('');
   const [issuer, setIssuer] = useState(token?.issuer ?? '');
   const [account, setAccount] = useState(token?.account ?? '');
-  const [algorithm, setAlgorithm] = useState<OtpAlgorithm>(token?.algorithm ?? 'SHA1');
-  const [digits, setDigits] = useState<number>(token?.digits ?? 6);
-  const [period, setPeriod] = useState<number>(token?.period ?? 30);
+  const [algorithm, setAlgorithm] = useState<OtpAlgorithm>(
+    token?.algorithm ?? OTP_DEFAULT_ALGORITHM,
+  );
+  const [digits, setDigits] = useState<number>(token?.digits ?? OTP_DEFAULT_DIGITS);
+  const [period, setPeriod] = useState<number>(token?.period ?? OTP_DEFAULT_PERIOD);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 

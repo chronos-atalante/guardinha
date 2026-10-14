@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import { authDir, containerFile, entriesDir } from '@zero/main/layout';
 import { markVaultDestroyed } from '@zero/main/erasure-state';
 import { SHRED_PASSES, shredDirectory, shredFile } from '@zero/main/shred';
-import { vaultFiles } from '@zero/main/structure';
+import { TEMP_SUFFIX, vaultFiles } from '@zero/main/structure';
 import type { EraseResult } from '@zero/types';
 
 /**
@@ -41,7 +41,7 @@ export function eraseVault(): EraseResult {
 
   // o container e o `.tmp` entram primeiro e à mão: `vaultFiles()` pode não
   // estar liberado para leitura se o shred anterior derrubou a pasta
-  const targets = new Set<string>([containerFile(), `${containerFile()}.tmp`]);
+  const targets = new Set<string>([containerFile(), `${containerFile()}${TEMP_SUFFIX}`]);
   for (const file of vaultFiles()) targets.add(file);
 
   for (const file of targets) {

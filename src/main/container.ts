@@ -1,4 +1,5 @@
 import { decryptRecord, encryptRecord, isValidKdfParams } from '@zero/main/crypto';
+import { currentMessages } from '@zero/main/i18n';
 import type { Argon2Params, SaltedPayload } from '@zero/main/crypto';
 
 /**
@@ -7,7 +8,7 @@ import type { Argon2Params, SaltedPayload } from '@zero/main/crypto';
  * - `vault.zkv` (magic `ZKVAULT1`): contagem da trava exponencial + blobs de
  *   chave embrulhados (cada um com o custo de Argon2id do seu método) + o
  *   limite de autodestruição + manifesto cifrado.
- * - `entries/<uuid>.zke` (magic `ZENTRY01`): salt | IV | tag | texto cifrado.
+ * - `.entries/<uuid>.zke` (magic `ZENTRY01`): salt | IV | tag | texto cifrado.
  *
  * Toda leitura é fail-closed: forma inválida, truncamento, parâmetro KDF fora
  * da faixa ou byte adulterado devolvem `null` (ou lançam), nunca conteúdo em
@@ -65,6 +66,19 @@ export interface WrappedMethod {
   payload: SaltedPayload;
 }
 
+/**
+ * Chave do cofre embrulhada por cada credencial (blobs cifrados). Cada
+ * entrada é opcional de propósito: um cofre novo não tem PIN de pânico, e um
+ * cofre que perdeu a senha mestra pode ainda ter a frase de recuperação.
+ */
+export interface VaultMethods {
+  master?: WrappedMethod;
+  pin?: WrappedMethod;
+  recovery?: WrappedMethod;
+  /** PIN de coação: embrulha uma chave decoy, sem relação com a chave real. */
+  panic?: WrappedMethod;
+}
+
 export interface VaultContainerData {
   createdAt: number;
   attempts: number;
@@ -78,15 +92,24 @@ export interface VaultContainerData {
    */
   nukeLimit: number;
   /** Chave do cofre embrulhada por cada credencial (blobs cifrados). */
-  methods: {
-    master?: WrappedMethod;
-    pin?: WrappedMethod;
-    recovery?: WrappedMethod;
-    /** PIN de coação: embrulha uma chave decoy, sem relação com a chave real. */
-    panic?: WrappedMethod;
-  };
+  methods: VaultMethods;
   /** Lista de ids cifrada com a chave do cofre; `null` = ainda não sellada. */
   manifest: SaltedPayload | null;
+}
+
+/** Nome do método de desbloqueio, na ordem em que os flags aparecem no arquivo. */
+export type WrappedMethodName = 'master' | 'pin' | 'recovery' | 'panic';
+
+/** Par do reader de blob: o que leu e onde recomeçar a ler. */
+interface BlobRead {
+  payload: SaltedPayload;
+  next: number;
+}
+
+/** Par do reader de método: o que leu e onde recomeçar a ler. */
+interface MethodRead {
+  method: WrappedMethod;
+  next: number;
 }
 
 function blobBytes(payload: SaltedPayload): number {
@@ -98,7 +121,7 @@ function methodBlobBytes(method: WrappedMethod): number {
 }
 
 function assertKdf(value: VaultKdfParams): void {
-  if (!isValidKdfParams(value)) throw new Error('parâmetros KDF inválidos');
+  if (!isValidKdfParams(value)) throw new Error(currentMessages().errors.invalidKdfParams);
 }
 
 function writeBlob(buffer: Buffer, offset: number, payload: SaltedPayload): number {
@@ -111,7 +134,7 @@ function writeBlob(buffer: Buffer, offset: number, payload: SaltedPayload): numb
   return offset + 52 + text.length;
 }
 
-function readBlob(buffer: Buffer, offset: number): { payload: SaltedPayload; next: number } | null {
+function readBlob(buffer: Buffer, offset: number): BlobRead | null {
   const head = offset + BLOB_HEAD_BYTES;
   if (head > buffer.length) return null;
   const textLength = buffer.readUInt32BE(offset + 48);
@@ -147,11 +170,7 @@ function readKdfAt(buffer: Buffer, offset: number): VaultKdfParams | null {
   return isValidKdfParams(kdf) ? kdf : null;
 }
 
-function readMethodBlob(
-  buffer: Buffer,
-  offset: number,
-  kdf: VaultKdfParams,
-): { method: WrappedMethod; next: number } | null {
+function readMethodBlob(buffer: Buffer, offset: number, kdf: VaultKdfParams): MethodRead | null {
   if (offset + 16 > buffer.length) return null;
   const read = readBlob(buffer, offset + 16);
   if (read === null) return null;
@@ -233,7 +252,7 @@ export function unpackVaultContainer(buffer: Buffer): VaultUnpackResult {
 
   let cursor = HEADER_BYTES;
   const methods: VaultContainerData['methods'] = {};
-  const entries: [number, 'master' | 'pin' | 'recovery' | 'panic'][] = [
+  const entries: [number, WrappedMethodName][] = [
     [FLAG_MASTER, 'master'],
     [FLAG_PIN, 'pin'],
     [FLAG_RECOVERY, 'recovery'],
@@ -331,11 +350,12 @@ export function sealManifest(vaultKey: Buffer, ids: string[], authIds: string[])
  * app saber gerar 2FA, então não há `.auth` que o manifesto precise cobrir.
  */
 export function openManifest(vaultKey: Buffer, payload: SaltedPayload): ManifestContent {
+  const m = currentMessages();
   const value = decryptRecord(payload, vaultKey) as Record<string, unknown>;
   const ids = stringList(value.ids);
-  if (ids === null) throw new Error('manifesto inválido');
-  if (value.v !== MANIFEST_VERSION) throw new Error('manifesto inválido');
+  if (ids === null) throw new Error(m.errors.invalidManifest);
+  if (value.v !== MANIFEST_VERSION) throw new Error(m.errors.invalidManifest);
   const authIds = stringList(value.authIds);
-  if (authIds === null) throw new Error('manifesto inválido');
+  if (authIds === null) throw new Error(m.errors.invalidManifest);
   return { ids, authIds };
 }

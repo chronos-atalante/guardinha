@@ -163,13 +163,25 @@ describe('o servidor de assets', () => {
     expect(pedir('/assets/').status).toBe(404);
   });
 
+  it('o 404 diz o que aconteceu, e não devolve corpo vazio', async () => {
+    // O corpo do 404 é o que aparece no DevTools e no log do Chromium quando o
+    // bundle não foi montado. Sem texto, a falha some e só sobra o status. A
+    // frase é de status do protocolo, em inglês e literal: quem lê é o
+    // carregador de asset, não a interface, então ela não vem do bundle.
+    existeSync.mockReturnValue(false);
+    const resposta = pedir('/assets/faltando.js');
+
+    expect(resposta.status).toBe(404);
+    expect(await resposta.text()).toBe('Not Found');
+  });
+
   it('devolve 500 quando a leitura estoura, sem derrubar o protocolo', async () => {
     readFileSync.mockImplementation(() => {
       throw new Error('disco indisponível');
     });
     const resposta = pedir('/assets/app.js');
     expect(resposta.status).toBe(500);
-    expect(await resposta.text()).toBe('Erro');
+    expect(await resposta.text()).toBe('Internal Error');
   });
 });
 
@@ -182,6 +194,15 @@ describe('os assets resolvidos no boot', () => {
     // `format: 'cjs'` está fixado em `electron.vite.config.mts` porque o preload
     // roda sandboxed como script simples, sem loader ESM.
     expect(resolvePreloadScript()).toMatch(/index\.c[cm]?js$/);
+  });
+
+  it('o preload é procurado na pasta preload, irmã do main', () => {
+    // `path.join(__dirname, '../preload')`: resolver a partir de `__dirname`
+    // direto colocaria o bundle no mesmo diretório do main, que é onde o
+    // `electron-vite` não escreve nada, e a janela receberia um preload que não
+    // existe, silenciosamente.
+    expect(path.basename(path.dirname(resolvePreloadScript()))).toBe('preload');
+    expect(path.dirname(resolvePreloadScript())).not.toBe(path.dirname(path.dirname(__filename)));
   });
 
   it('o fallback do preload também é .cjs quando nada existe no bundle', () => {

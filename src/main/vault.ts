@@ -1,12 +1,10 @@
-import { normalizeRecoveryPhrase, RECOVERY_MIN_WORDS } from '@zero/main/crypto';
+import { normalizeRecoveryPhrase } from '@zero/main/crypto';
 import {
   getLockRemainingMs,
   loadAuthState,
   registerFailedAttempt,
   resetAttempts,
   statusFrom,
-  validateMasterPasswordFormat,
-  validatePinFormat,
 } from '@zero/main/auth';
 import { vaultStorage } from '@zero/main/facade';
 import { vaultSession } from '@zero/main/session';
@@ -16,7 +14,14 @@ import { clearDestroyedFlag } from '@zero/main/erasure-state';
 import { decoyKey, isKdfUpToDate, keyUnwrapperFor } from '@zero/main/unwrapping';
 import { runUnlockChain } from '@zero/main/unlock';
 import type { UnlockContext } from '@zero/main/unlock';
-import { formatCountdown, strengthFor } from '@zero/shared';
+import {
+  errorMessage,
+  formatCountdown,
+  isMasterPasswordFormat,
+  isPinFormat,
+  RECOVERY_MIN_WORDS,
+  strengthFor,
+} from '@zero/shared';
 import { currentMessages } from '@zero/main/i18n';
 import type { VaultContainerData } from '@zero/main/container';
 import type {
@@ -86,11 +91,6 @@ function fail(error: string): VaultResult {
   return { ok: false, error, status: getStatus() };
 }
 
-/** A mensagem já vem localizada do `storage`; o fallback cobre o erro solto. */
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message !== '' ? error.message : fallback;
-}
-
 /**
  * Sobe o custo do Argon2id quando o método gravado está mais fraco que o
  * perfil atual. Só quem detém a credencial consegue reembrulhar, então cada
@@ -117,14 +117,14 @@ async function upgradeMethod(
 /** Cria o cofre com frase de recuperação escrita pelo próprio usuário. */
 export async function createVault(input: CreateVaultInput): Promise<VaultResult> {
   const m = currentMessages();
-  if (!validateMasterPasswordFormat(input.masterPassword)) {
+  if (!isMasterPasswordFormat(input.masterPassword)) {
     return { ok: false, error: m.errors.invalidMasterLength, status: getStatus() };
   }
   // revalida a força aqui: o renderer é conveniência, não é fronteira de segurança
   if (strengthFor('master').evaluate(input.masterPassword).blocked) {
     return { ok: false, error: m.errors.trivialMaster, status: getStatus() };
   }
-  if (!validatePinFormat(input.pin)) {
+  if (!isPinFormat(input.pin)) {
     return { ok: false, error: m.errors.invalidPin, status: getStatus() };
   }
   if (strengthFor('pin').evaluate(input.pin).blocked) {
@@ -211,7 +211,7 @@ async function tryPanicUnlock(input: UnlockInput, container: VaultContainerData)
   const method = container.methods.panic;
   // só faz sentido para algo no formato de PIN: uma senha mestra de 24
   // caracteres nunca é o PIN de pânico, e o custo é o mesmo
-  if (method === undefined || input.kind !== 'pin' || !validatePinFormat(input.credential)) {
+  if (method === undefined || input.kind !== 'pin' || !isPinFormat(input.credential)) {
     return false;
   }
   const unwrapper = keyUnwrapperFor('panic');
@@ -286,7 +286,7 @@ export async function unlock(input: UnlockInput): Promise<VaultResult> {
 export async function setPanicPin(input: PanicPinInput): Promise<VaultResult> {
   const m = currentMessages();
   if (!vaultSession().isUnlocked()) return fail(m.errors.vaultLocked);
-  if (!validatePinFormat(input.pin)) return fail(m.errors.invalidPin);
+  if (!isPinFormat(input.pin)) return fail(m.errors.invalidPin);
   if (strengthFor('pin').evaluate(input.pin).blocked) return fail(m.errors.trivialPin);
 
   const container = vaultStorage.readContainer();
@@ -383,7 +383,7 @@ export async function resetPin(input: ResetPinInput): Promise<VaultResult> {
   if (locked > 0) {
     return fail(m.auth.lockout(formatCountdown(locked)));
   }
-  if (!validatePinFormat(input.newPin)) return fail(m.errors.invalidPin);
+  if (!isPinFormat(input.newPin)) return fail(m.errors.invalidPin);
   if (strengthFor('pin').evaluate(input.newPin).blocked) return fail(m.errors.trivialPin);
 
   const method = container.methods.recovery;
@@ -392,7 +392,9 @@ export async function resetPin(input: ResetPinInput): Promise<VaultResult> {
   const recovery = keyUnwrapperFor('recovery');
   try {
     const phrase = normalizeRecoveryPhrase(input.phrase);
-    if (phrase.split(' ').length < RECOVERY_MIN_WORDS) throw new Error('frase curta');
+    if (phrase.split(' ').length < RECOVERY_MIN_WORDS) {
+      throw new Error(m.errors.shortPhrase);
+    }
     const derived = await recovery.derive(method, phrase);
     // a chave de trabalho sai da RAM mesmo se o desembrulho falhar, então o
     // zero fica no `finally` e não no corpo feliz

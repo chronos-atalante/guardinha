@@ -5,6 +5,7 @@ import { currentMessages } from '@zero/main/i18n';
 import { totp, totpRemainingMs } from '@zero/main/totp';
 import {
   base32Decode,
+  isUuid,
   normalizeBase32,
   OTP_ALGORITHMS,
   OTP_DIGIT_CHOICES,
@@ -12,7 +13,6 @@ import {
   OTP_SECRET_MIN_BYTES,
   parseOtpAuthUri,
 } from '@zero/shared';
-import type { OtpAlgorithm } from '@zero/shared';
 import type { AuthCode, AuthToken, AuthTokenDraft } from '@zero/types';
 
 /**
@@ -25,19 +25,8 @@ import type { AuthCode, AuthToken, AuthTokenDraft } from '@zero/types';
  * retorno é o que atravessa o IPC para o processo da interface.
  */
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Registro decifrado → o que o renderer enxerga (sem o segredo). */
-function toPublicToken(record: {
-  id: string;
-  issuer: string;
-  account: string;
-  algorithm: OtpAlgorithm;
-  digits: number;
-  period: number;
-  createdAt: number;
-  updatedAt: number;
-}): AuthToken {
+function toPublicToken(record: AuthToken): AuthToken {
   return {
     id: record.id,
     issuer: record.issuer,
@@ -123,7 +112,7 @@ export function saveToken(input: AuthTokenDraft): AuthToken[] {
   let id = vaultStorage.newId();
   let createdAt = now;
   if (input.id !== undefined && input.id !== '') {
-    if (!UUID_PATTERN.test(input.id)) throw new Error(m.errors.invalidId);
+    if (!isUuid(input.id)) throw new Error(m.errors.invalidId);
     if (!vaultStorage.listAuthIds().includes(input.id)) throw new Error(m.errors.authTokenNotFound);
     createdAt = vaultStorage.readAuthSecret(input.id, key).createdAt;
     id = input.id;
@@ -150,7 +139,7 @@ export function saveToken(input: AuthTokenDraft): AuthToken[] {
 /** Apaga o arquivo cifrado do token e re-sela o manifesto. */
 export function removeToken(id: string): AuthToken[] {
   const key = requireSessionKey();
-  if (!UUID_PATTERN.test(id)) throw new Error(currentMessages().errors.invalidId);
+  if (!isUuid(id)) throw new Error(currentMessages().errors.invalidId);
   if (!vaultStorage.listAuthIds().includes(id)) {
     throw new Error(currentMessages().errors.authTokenNotFound);
   }

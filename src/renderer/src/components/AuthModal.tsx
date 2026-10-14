@@ -2,10 +2,17 @@ import { useEffect, useState } from 'react';
 import type { JSX, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { ArrowLeft, Hash, KeyRound, Lock, ShieldCheck, Sparkles } from 'lucide-react';
 import { richText, useMessages } from '@zero/renderer/i18n';
-import { countWords, errorMessage, normalizePhrase } from '@zero/renderer/formatters';
+import { countWords, normalizePhrase } from '@zero/renderer/formatters';
 import { StrengthMeter } from '@zero/renderer/components/StrengthMeter';
-import { formatCountdown, strengthFor } from '@zero/shared';
-import type { VaultStatus } from '@zero/types';
+import {
+  errorMessage,
+  formatCountdown,
+  isPinFormat,
+  MASTER_PASSWORD_LENGTH,
+  RECOVERY_MIN_WORDS,
+  strengthFor,
+} from '@zero/shared';
+import type { AuthMode, AuthStep, UnlockKind, VaultStatus } from '@zero/types';
 
 interface AuthModalProps {
   status: VaultStatus;
@@ -13,18 +20,18 @@ interface AuthModalProps {
   onRefresh: () => Promise<void>;
 }
 
-/**
- * Mínimo de palavras da frase de recuperação (espelha `RECOVERY_MIN_WORDS`
- * de `@zero/main/crypto`; o renderer não importa módulos do main).
- */
-const RECOVERY_MIN_WORDS = 12;
+/** Uma aba do desbloqueio: o rótulo e qual forma de login ela abre. */
+interface UnlockTab {
+  key: UnlockKind;
+  label: string;
+}
 
 export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
   const m = useMessages();
   const isCreate = !status.exists;
 
   // ----- criação -----
-  const [step, setStep] = useState<'credentials' | 'recovery'>('credentials');
+  const [step, setStep] = useState<AuthStep>('credentials');
   const [master, setMaster] = useState('');
   const [masterConfirm, setMasterConfirm] = useState('');
   const [pin, setPin] = useState('');
@@ -32,7 +39,7 @@ export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
   const [phraseConfirm, setPhraseConfirm] = useState('');
 
   // ----- desbloqueio -----
-  const [mode, setMode] = useState<'pin' | 'master' | 'reset'>('pin');
+  const [mode, setMode] = useState<AuthMode>('pin');
   const [credential, setCredential] = useState('');
   const [resetPhrase, setResetPhrase] = useState('');
   const [newPin, setNewPin] = useState('');
@@ -66,8 +73,8 @@ export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
 
   const handleCreateCredentials = (): void => {
     setError(null);
-    if (master.length !== 24) {
-      setError(m.auth.masterLength(24, master.length));
+    if (master.length !== MASTER_PASSWORD_LENGTH) {
+      setError(m.auth.masterLength(MASTER_PASSWORD_LENGTH, master.length));
       return;
     }
     if (strengthFor('master').evaluate(master).blocked) {
@@ -78,7 +85,7 @@ export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
       setError(m.auth.masterMismatch);
       return;
     }
-    if (!/^\d{8}$/.test(pin)) {
+    if (!isPinFormat(pin)) {
       setError(m.auth.pinInvalid);
       return;
     }
@@ -156,7 +163,7 @@ export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
       setError(m.auth.recoveryTooShort(RECOVERY_MIN_WORDS, words));
       return;
     }
-    if (!/^\d{8}$/.test(newPin)) {
+    if (!isPinFormat(newPin)) {
       setError(m.auth.pinInvalid);
       return;
     }
@@ -419,7 +426,7 @@ export function AuthModal({ status, onRefresh }: AuthModalProps): JSX.Element {
     );
   }
 
-  const tabs: { key: 'pin' | 'master'; label: string }[] = [{ key: 'pin', label: m.auth.tabPin }];
+  const tabs: UnlockTab[] = [{ key: 'pin', label: m.auth.tabPin }];
   if (showMaster) tabs.push({ key: 'master', label: m.auth.tabMaster });
 
   return shell(

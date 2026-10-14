@@ -59,4 +59,24 @@ describe('retentativa de criação após setup privilegiado', () => {
       error: m.errors.vaultExists,
     });
   });
+
+  it('segue para a criação quando a retentativa não acha cofre nenhum', async () => {
+    // O outro lado da mesma checagem: `exists()` falso nos dois pontos tem de
+    // deixar a criação seguir. A chave é o que prova isso sem pagar três
+    // derivações Argon2id: o `createKey` só é chamado depois da recontagem, e
+    // um cofre vazio depois do setup privilegiado é um caminho que a suíte
+    // nunca exercitou.
+    const m = currentMessages();
+    const chegouAqui = new Error('a criação seguiu adiante');
+    vi.spyOn(vaultStorage, 'exists').mockReturnValue(false);
+    vi.spyOn(vaultStorage, 'ensureStructure').mockImplementationOnce(() => {
+      throw new Error(m.errors.vaultDirUnavailable);
+    });
+    vi.spyOn(privilege, 'setupVaultDirectory').mockReturnValue(true);
+    vi.spyOn(vaultStorage, 'createKey').mockImplementation(() => {
+      throw chegouAqui;
+    });
+
+    await expect(createVault(INPUT)).rejects.toBe(chegouAqui);
+  });
 });

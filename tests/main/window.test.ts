@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { app, BrowserWindow, clipboard, ipcMain, session, shell } from '../mocks/electron.ts';
 import { activityMonitor, IDLE_LOCK_MS } from '@zero/main/activity';
@@ -324,5 +325,70 @@ describe('sessão perdida durante uma operação do cofre', () => {
     app.quit.mockClear();
     allClosed?.();
     expect(app.quit).toHaveBeenCalledOnce();
+  });
+});
+
+/**
+ * Depois que a janela fecha, o `mainWindow` do módulo vira `null` e todo
+ * caminho que fala com ele passa a ser opcional: mostrar a janela, empurrar o
+ * aviso de auto-lock e avisar a sessão perdida. Sem o `?.`, o `TypeError`
+ * apareceria no lugar da operação, dentro de um `once` do Electron que ninguém
+ * está olhando.
+ */
+describe('com a janela já fechada', () => {
+  async function fecharJanela(): Promise<BrowserWindow> {
+    const win = await waitForWindow();
+    const closed = win.on.mock.calls.find(([event]) => event === 'closed')?.[1];
+    closed?.();
+    return win;
+  }
+
+  it('o ready-to-show que chega depois do fechamento não estoura', async () => {
+    const win = await fecharJanela();
+    const ready = win.once.mock.calls.find(([event]) => event === 'ready-to-show')?.[1];
+
+    expect(() => ready?.()).not.toThrow();
+  });
+
+  it('o aviso de sessão perdida sai sem janela, sem trocar o erro do canal', async () => {
+    const win = await fecharJanela();
+    win.webContents.send.mockClear();
+    vaultSession().wipe();
+    const handler = ipcMain.handle.mock.calls.find(([name]) => name === 'entries:list')?.[1];
+
+    // o aviso é o melhor esforço: quem interessa é o erro original subir
+    expect(() => handler?.({ senderFrame: { url: 'guardinha://app/index.html' } })).toThrow(
+      currentMessages().errors.vaultLocked,
+    );
+    expect(win.webContents.send).not.toHaveBeenCalled();
+  });
+
+  it('o auto-lock sem janela não derruba o temporizador', async () => {
+    await fecharJanela();
+
+    vi.useFakeTimers();
+    try {
+      activityMonitor.touch();
+      await expect(vi.advanceTimersByTimeAsync(IDLE_LOCK_MS)).resolves.not.toThrow();
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(vaultSession().isUnlocked()).toBe(false);
+  });
+
+  it('a janela nasce sem a chave icon quando o build não deixou o arquivo', () => {
+    // `...(iconPath === undefined ? {} : { icon: iconPath })`: sem o ternário, a
+    // janela receberia `icon: undefined`, que o Electron tenta abrir e falha.
+    const existe = vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+    const activate = app.on.mock.calls.find(([event]) => event === 'activate')?.[1];
+    BrowserWindow.getAllWindows.mockReturnValue([]);
+    try {
+      activate?.();
+      const criada = BrowserWindow.instances.at(-1);
+      if (criada === undefined) throw new Error('activate não criou janela');
+      expect('icon' in criada.options).toBe(false);
+    } finally {
+      existe.mockRestore();
+    }
   });
 });

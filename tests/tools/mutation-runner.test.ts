@@ -156,10 +156,13 @@ describe('grafo de módulos', () => {
     const graph = buildModuleGraph(process.cwd());
     // `scope.ts` já exclui `node.loader.ts`, `shared/index.ts` e os tipos; se
     // aparecer outro órfão, é arquivo de `src/` que nenhum teste alcança.
-    expect(graph.orphans).toEqual([
-      'src/node.loader.ts',
-      'src/shared/index.ts',
-      'src/types/index.ts',
-    ]);
+    //
+    // `src/shared/index.ts` saiu da lista quando `tests/main/authenticator.test.ts`
+    // passou a importar o barrel com `import type` de topo, no lugar do
+    // `typeof import('@zero/shared')` que estava escrito dentro do `vi.mock`.
+    // As duas formas são de tipo e não mudam o runtime do teste, mas só a
+    // primeira é uma aresta que o grafo acompanha: o barrel deixou de ser
+    // órfão. Nenhum score muda, porque ele está em `DEFAULT_EXCLUDES`.
+    expect(graph.orphans).toEqual(['src/node.loader.ts', 'src/types/index.ts']);
   });
 });

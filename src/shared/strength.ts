@@ -40,6 +40,18 @@ export interface StrengthResult {
   reasons: StrengthReason[];
 }
 
+/** Nota bruta: o nível na régua e quantos segmentos da barra acendem. */
+interface Grade {
+  level: StrengthLevel;
+  score: number;
+}
+
+/** Quantas categorias de caractere aparecem e o tamanho do alfabeto delas. */
+interface CharStats {
+  kinds: number;
+  size: number;
+}
+
 /** Bits por palavra de um vocabulário tipo diceware (~7776). */
 const WORDS_BIT = 12.9;
 /** Um bloco de até 12 caracteres repetido preenche a string toda = degenerado. */
@@ -178,14 +190,14 @@ function emptyResult(): StrengthResult {
   return { level: 'veryWeak', score: 0, blocked: false, reasons: [] };
 }
 
-function grade(bits: number, cap = 4): { level: StrengthLevel; score: number } {
+function grade(bits: number, cap = 4): Grade {
   const raw = bits < 28 ? 0 : bits < 36 ? 1 : bits < 60 ? 2 : bits < 80 ? 3 : 4;
   const score = Math.max(0, Math.min(raw, cap, 4));
   return { level: LEVELS[score] ?? 'veryWeak', score };
 }
 
 /** Nota do PIN: 8 dígitos nunca passam de "razoável" (o formato não é força). */
-function gradePin(bits: number): { level: StrengthLevel; score: number } {
+function gradePin(bits: number): Grade {
   const score = bits >= 24 ? 2 : bits >= 16 ? 1 : 0;
   return { level: LEVELS[score] ?? 'veryWeak', score };
 }
@@ -233,7 +245,7 @@ function looksLikeDate(digits: string): boolean {
   );
 }
 
-function charStats(text: string): { kinds: number; size: number } {
+function charStats(text: string): CharStats {
   let kinds = 0;
   let size = 0;
   if (/[a-z]/.test(text)) {

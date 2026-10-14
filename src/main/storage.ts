@@ -8,25 +8,21 @@ import {
 import { currentMessages } from '@zero/main/i18n';
 import { containerFile } from '@zero/main/layout';
 import { isVaultDestroyed } from '@zero/main/erasure-state';
-import { ensureVaultStructure } from '@zero/main/structure';
+import { ensureVaultStructure, writeSecretFile } from '@zero/main/structure';
 import { listAuthIds } from '@zero/main/auth-store';
 import { listEntryIds } from '@zero/main/entries-store';
 import type { ManifestContent, VaultContainerData } from '@zero/main/container';
+import type { PersistedAuthState } from '@zero/types';
 
 /**
  * Container do cofre (`vault.zkv`): chaves embrulhadas, trava exponencial e
  * manifesto cifrado. Os arquivos das credenciais ficam em `entries-store.ts` e a
  * estrutura de pastas em `structure.ts`; aqui é só o arquivo do container.
+ *
+ * A forma do estado da trava (`PersistedAuthState`) mora em `@zero/types`: quem
+ * calcula a trava é `auth.ts`, não este arquivo, então declará-la aqui só
+ * obrigaria o resto do main a depender do módulo de disco para nomear um tipo.
  */
-
-export interface PersistedAuthState {
-  attempts: number;
-  lockUntil: number | null;
-  /** Falhas só da senha mestra (campo da v4); PIN não soma aqui. */
-  attemptsMaster: number;
-  /** Limite estrito da senha mestra; `0` = autodestruição desligada. */
-  nukeLimit: number;
-}
 
 /** Estado neutro: cofre ausente ou ilegível não pode parecer "tentou 0 vezes". */
 const EMPTY_AUTH_STATE: PersistedAuthState = {
@@ -80,11 +76,7 @@ export function writeVaultContainer(data: VaultContainerData): void {
   // libera de novo, e só porque o usuário pediu um cofre novo.
   if (isVaultDestroyed()) return;
   ensureVaultStructure();
-  const buffer = packVaultContainer(data);
-  const tmp = `${containerFile()}.tmp`;
-  fs.writeFileSync(tmp, buffer, { mode: 0o600 });
-  fs.renameSync(tmp, containerFile());
-  fs.chmodSync(containerFile(), 0o600);
+  writeSecretFile(containerFile(), packVaultContainer(data));
 }
 
 // ---------- Estado da trava exponencial (dentro do container) ----------

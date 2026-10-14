@@ -4,6 +4,48 @@ Todos os lançamentos seguem [versionamento semântico](https://semver.org/lang/
 (`MAJOR.MINOR.PATCH`) e o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 em português do Brasil.
 
+## [1.6.3] - 2026-10-14
+
+### Corrigido
+
+- **A recusa de IPC saía sempre em português.** A guarda de origem do frame
+  montava a mensagem com texto fixo no código, então quem estivesse no inglês,
+  no coreano ou no japonês veria o erro no idioma do Brasil. Agora ela sai do
+  bundle, como todo erro do processo principal.
+
+### Alterado
+
+- **Nenhum texto de erro fica mais escrito dentro do código.** As invariantes
+  internas (`containerCorrupted`, `invalidManifest`, `invalidKdfParams`,
+  `unknownUnlockMethod`, `truncatedDigest`, `shortPhrase`) passaram a vir do
+  bundle de mensagens. O caminho normal continua convertendo quase todas em
+  "cofre adulterado" ou "PIN incorreto" antes de a tela ver qualquer coisa; o
+  que muda é que a regra de que todo erro emitido pelo processo principal sai
+  de `src/messages/` passa a valer sem lista de exceções.
+- **Respostas do servidor `guardinha://`:** os corpos de erro estavam
+  misturados, com `Forbidden` em inglês ao lado de `Não encontrado.` e `Erro` em
+  português. Viraram frases de status do protocolo, em inglês e literais: é
+  transporte, não interface, e quem chega ali é o carregador de asset, não a
+  tela.
+
+### Documentação
+
+- **Índice da documentação em `docs/README.md`.** O arquivo era citado por
+  cinco documentos, inclusive pelo `README.md` da raiz, mas não existia. Agora
+  existe e reúne os onze guias técnicos.
+- **Números conferidos contra o repositório:** a suíte tem 64 arquivos de teste
+  e não 51, e a tabela agora lista os 13 que faltavam; são oito jobs de CI, e
+  não sete; o pin do `upload-artifact` é v7.0.2; a tabela de versões suportadas
+  do `SECURITY.md` voltou a listar a 1.2.x; o placar da varredura de mutação é
+  69,4%, e não 70,2%.
+- **Comentários que descreviam o contrário do código:** a pasta de credenciais
+  é `.entries` e não `entries`; o botão de autodestruição fica logo abaixo do
+  bloqueio, e não "longe" dele; o workflow de qualidade fala da porta de 95% de
+  cobertura, que é a que o `vitest.config.mts` impõe.
+- **Fluxo de contribuição:** a seção de envio de mudança agora diz para criar o
+  branch a partir da `developer`, que é de onde os workflows disparam, e não da
+  `main`.
+
 ## [1.6.2] - 2026-10-13
 
 ### Corrigido

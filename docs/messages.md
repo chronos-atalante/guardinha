@@ -47,6 +47,18 @@ Sidebar (`settings.set`).
   (título da janela, nomes de pacotes).
 - **Logs** (`console.error`): diagnóstico, não UI.
 - **Chaves internas**: nomes de canal IPC, ids de arquivo, regex.
+- **Frases de status do protocolo**: os corpos de resposta do servidor de
+  assets `guardinha://` (`Forbidden`, `Not Found`, `Internal Error`, em
+  `protocol.ts`). É transporte, não interface: quem chega ali é o carregador de
+  asset, e localizá-lo seria ler o `settings.json` a cada requisição.
+
+Pelo resto não há exceção: todo `Error` lançado pelo processo main tira a
+frase do bundle, inclusive as invariantes internas (`containerCorrupted`,
+`invalidManifest`, `invalidKdfParams`, `unknownUnlockMethod`,
+`truncatedDigest`, `shortPhrase`). O caminho normal converte quase todas em
+`vaultTampered` ou `wrongPin` antes de a tela ver qualquer coisa, mas o texto
+mora no bundle para que a regra da `AGENTS.md` não precise de lista de
+exceções para continuar verdadeira.
 
 ## Adicionando uma string
 

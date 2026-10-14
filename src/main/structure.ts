@@ -4,15 +4,40 @@ import { currentMessages } from '@zero/main/i18n';
 import { authDir, entriesDir, vaultDir } from '@zero/main/layout';
 
 /**
- * Estrutura de diretórios do cofre: garante as pastas com o modo certo e sabe
- * listar o que existe lá dentro. Fica entre `layout.ts` (só caminhos) e os
- * módulos que leem e escrevem arquivo, para que nenhum deles precise repetir a
- * árvore de pastas nem criar ciclo de importação com quem escreve o container.
+ * Estrutura de diretórios do cofre: garante as pastas com o modo certo, sabe
+ * listar o que existe lá dentro e concentra a escrita atômica de arquivo.
+ * Fica entre `layout.ts` (só caminhos) e os módulos que leem e escrevem
+ * arquivo, para que nenhum deles precise repetir a árvore de pastas nem criar
+ * ciclo de importação com quem escreve o container.
  */
+
+/** Modo de arquivo com segredo: só o dono lê e escreve. */
+const SECRET_FILE_MODE = 0o600;
+
+/** Sufixo do temporário da escrita atômica; o `erase` e a varredura olham ele. */
+export const TEMP_SUFFIX = '.tmp';
+
+/**
+ * Grava arquivo de segredo de forma atômica: temporário no mesmo diretório,
+ * `rename` e `chmod` no destino.
+ *
+ * A sequência estava copiada em `storage.ts`, `entries-store.ts`,
+ * `auth-store.ts` e `settings.ts`, e uma das cópias tinha perdido o `chmod`.
+ * O `rename` já entrega um inode novo, com o modo do temporário, mas isso é
+ * implícito demais para um arquivo que guarda segredo cifrado: o `chmod`
+ * explícito é o que fecha a porta quando o destino já existia com permissão
+ * frouxa, e é o que mantém as cópias iguais.
+ */
+export function writeSecretFile(file: string, data: Buffer | string): void {
+  const tmp = `${file}${TEMP_SUFFIX}`;
+  fs.writeFileSync(tmp, data, { mode: SECRET_FILE_MODE });
+  fs.renameSync(tmp, file);
+  fs.chmodSync(file, SECRET_FILE_MODE);
+}
 
 export function isPermissionError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
-  const code = (error as { code?: unknown }).code;
+  const code = (error as NodeJS.ErrnoException).code;
   return code === 'EACCES' || code === 'EPERM' || code === 'EROFS';
 }
 

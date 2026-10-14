@@ -3,10 +3,16 @@ import path from 'node:path';
 import { packEntryPayload, unpackEntryPayload } from '@zero/main/container';
 import { currentMessages } from '@zero/main/i18n';
 import { entriesDir } from '@zero/main/layout';
-import { ensureVaultStructure, vaultFiles } from '@zero/main/structure';
+import {
+  ensureVaultStructure,
+  TEMP_SUFFIX,
+  vaultFiles,
+  writeSecretFile,
+} from '@zero/main/structure';
 import { randomBytes } from '@zero/main/crypto';
 import { SHRED_PASSES, shredFile } from '@zero/main/shred';
 import type { SaltedPayload } from '@zero/main/crypto';
+import type { TempCleanupResult } from '@zero/types';
 
 /**
  * Arquivos individuais das credenciais (`.entries/<uuid>.zke`). Saiu de
@@ -64,11 +70,7 @@ export function readEntryPayload(id: string): SaltedPayload {
 export function writeEntryPayload(id: string, payload: SaltedPayload): void {
   assertSafeEntryId(id);
   ensureVaultStructure();
-  const buffer = packEntryPayload(payload);
-  const file = entryFile(id);
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, buffer, { mode: 0o600 });
-  fs.renameSync(tmp, file);
+  writeSecretFile(entryFile(id), packEntryPayload(payload));
 }
 
 /**
@@ -89,12 +91,12 @@ export function deleteEntry(id: string): void {
  * manifesto (`listEntryIds` só lista `.zke`), então sobrevive sem ninguém notar. Os mais velhos que `maxAgeMs` são sobrescritos e apagados; os
  * mais novos são deixados intactos, porque podem ser de uma escrita em curso.
  */
-export function cleanStaleTempFiles(maxAgeMs: number): { removed: number; kept: number } {
+export function cleanStaleTempFiles(maxAgeMs: number): TempCleanupResult {
   const cutoff = Date.now() - maxAgeMs;
   let removed = 0;
   let kept = 0;
   for (const file of vaultFiles()) {
-    if (!file.endsWith('.tmp')) continue;
+    if (!file.endsWith(TEMP_SUFFIX)) continue;
     let stale = true;
     try {
       stale = fs.statSync(file).mtimeMs < cutoff;

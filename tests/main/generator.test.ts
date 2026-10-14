@@ -64,6 +64,14 @@ describe('generateHighEntropyPassword', () => {
     expect(generateHighEntropyPassword(options({ length: 0, useUpper: true }))).toBe('');
   });
 
+  it('comprimento 1 devolve um caractere, e não vazio', () => {
+    // A guarda é `length <= 0`: em 1 o gerador tem de sortear, senão o medidor
+    // de força da tela mostra uma senha que não existe.
+    const senha = generateHighEntropyPassword(options({ length: 1, useLower: true }));
+    expect(senha).toHaveLength(1);
+    expect(senha).toMatch(/^[a-z]$/);
+  });
+
   it('palavras pessoais mudam a distribuição sem quebrar o formato', () => {
     const withWords = generateHighEntropyPassword(
       options({

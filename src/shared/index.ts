@@ -1,5 +1,13 @@
 export { base32Decode, base32Encode, isBase32, normalizeBase32 } from '@zero/shared/base32';
-export { formatCountdown } from '@zero/shared/format';
+export { errorMessage, formatCountdown } from '@zero/shared/format';
+export {
+  isMasterPasswordFormat,
+  isPinFormat,
+  isUuid,
+  MASTER_PASSWORD_LENGTH,
+  PIN_LENGTH,
+  RECOVERY_MIN_WORDS,
+} from '@zero/shared/policy';
 export {
   buildOtpAuthUri,
   OTP_ALGORITHMS,

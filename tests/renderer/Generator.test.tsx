@@ -211,3 +211,32 @@ describe('Generator', () => {
     expect(screen.queryByTitle('Copiar senha gerada')).not.toBeInTheDocument();
   });
 });
+
+describe('os limites do slider', () => {
+  it('vai de 0 a 72, que é o teto que o main aceita', () => {
+    // `assertGeneratorOptions` recusa acima de 72: se o slider deixasse passar
+    // 73, o app geraria a senha e a gravação seria recusada pelo main, com o
+    // usuário olhando para uma senha que não salva.
+    open();
+    expect(screen.getByRole('slider', { name: 'Tamanho da Senha' })).toHaveAttribute(
+      'aria-valuemax',
+      '72',
+    );
+  });
+
+  it('tamanho 1 avisa que o tamanho está vazio em vez de gerar', async () => {
+    // A guarda é `length <= 0`: em 1 o gerador tem o que sortear, e avisar
+    // "tamanho vazio" seria mentira.
+    const user = userEvent.setup();
+    installApi();
+    const onToast = open();
+    const slider = screen.getByRole('slider', { name: 'Tamanho da Senha' });
+    slider.focus();
+    for (let i = 0; i < 24; i++) await user.keyboard('{ArrowLeft}');
+
+    expect(slider).toHaveAttribute('aria-valuenow', '0');
+    await user.click(screen.getByRole('button', { name: /Gerar/i }));
+
+    expect(onToast).toHaveBeenCalledWith(expect.stringContaining('0'));
+  });
+});

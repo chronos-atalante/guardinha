@@ -24,6 +24,7 @@ export const en: Messages = {
     name: 'Guardinha',
     subtitle: 'Otaku Delirante',
     statusLocal: '100% Local / Encrypted',
+    statusLabel: 'Status:',
     nav: {
       home: 'Home (Passwords)',
       generator: 'Password Generator',
@@ -321,5 +322,13 @@ export const en: Messages = {
       'The setup key must be valid Base32 (A-Z and 2-7) and contain at least 128 bits (16 bytes).',
     authTokenNotFound: '2FA token not found.',
     internal: 'Internal vault error.',
+    /** Guarda de origem do IPC: o emissor não é a página oficial do app. */
+    foreignFrame: 'IPC blocked: the request did not come from the app page.',
+    containerCorrupted: 'Corrupted vault record.',
+    invalidManifest: 'Invalid integrity manifest.',
+    invalidKdfParams: 'Invalid KDF parameters.',
+    unknownUnlockMethod: (kind: string): string => `Unknown unlock method: ${kind}`,
+    truncatedDigest: 'Truncated HMAC digest.',
+    shortPhrase: 'Recovery phrase too short.',
   },
 };

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import * as base32 from '@zero/shared/base32';
 import { buildOtpAuthUri, parseOtpAuthUri } from '@zero/shared/otpauth';
 
 /**
@@ -10,6 +11,39 @@ import { buildOtpAuthUri, parseOtpAuthUri } from '@zero/shared/otpauth';
 
 const STRONG_SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 const GITHUB = `otpauth://totp/GitHub:alice@github.com?secret=${STRONG_SECRET}&issuer=GitHub`;
+
+/** Nomes dos parâmetros de consulta da URI, na ordem em que saem. */
+function parametrosDe(uri: string): string[] {
+  const consulta = uri.slice(uri.indexOf('?') + 1);
+  return [...new URLSearchParams(consulta).keys()];
+}
+
+/**
+ * O segredo é decifrado de um Base32 efêmero só para conferir o tamanho mínimo,
+ * e o buffer é zerado antes de a função voltar. O `fill(1)` silencioso deixaria
+ * o segredo do usuário inteiro na memória até o GC, sem mudar nada no que a
+ * função devolve: só a referência capturada denuncia.
+ */
+describe('o segredo decifrado some da memória', () => {
+  it('o buffer do Base32 é zerado depois da checagem de tamanho', () => {
+    const vistas: Uint8Array[] = [];
+    const original = base32.base32Decode.bind(base32);
+    vi.spyOn(base32, 'base32Decode').mockImplementation((value: string) => {
+      const bytes = original(value);
+      if (bytes !== null) vistas.push(bytes);
+      return bytes;
+    });
+
+    try {
+      expect(parseOtpAuthUri(GITHUB)).not.toBeNull();
+    } finally {
+      vi.restoreAllMocks();
+    }
+
+    expect(vistas.length).toBeGreaterThan(0);
+    for (const buffer of vistas) expect(buffer.every((byte) => byte === 0)).toBe(true);
+  });
+});
 
 describe('parseOtpAuthUri', () => {
   it('lê o exemplo da wiki do Google Authenticator', () => {
@@ -121,6 +155,29 @@ describe('parseOtpAuthUri', () => {
     ).toBeNull();
   });
 
+  it('aceita o período nas duas pontas da faixa e recusa logo fora delas', () => {
+    // Os limites são o que separa "token válido" de "token estranho": o serviço
+    // usa 30, alguns usam 15, e o teto de 300 é o que impede que a tela mostre
+    // um token travado. Fechar a faixa (`<=` no lugar de `<`) recusaria o
+    // período que a wiki recomenda; deixá-la aberta aceitaria qualquer número.
+    expect(
+      parseOtpAuthUri(`otpauth://totp/Site:eu?secret=${STRONG_SECRET}&period=15`)?.period,
+    ).toBe(15);
+    expect(
+      parseOtpAuthUri(`otpauth://totp/Site:eu?secret=${STRONG_SECRET}&period=300`)?.period,
+    ).toBe(300);
+    expect(parseOtpAuthUri(`otpauth://totp/Site:eu?secret=${STRONG_SECRET}&period=14`)).toBeNull();
+    expect(parseOtpAuthUri(`otpauth://totp/Site:eu?secret=${STRONG_SECRET}&period=301`)).toBeNull();
+  });
+
+  it('recusa período que não é número, em vez de gerar um NaN que vira tela', () => {
+    // `Number('abc')` é NaN, e NaN passa por qualquer comparação: sem o `||` no
+    // leitor de inteiro, o token nasceria com período NaN e o contador da tela
+    // ficaria sem barra de progresso para sempre.
+    expect(parseOtpAuthUri(`otpauth://totp/Site:eu?secret=${STRONG_SECRET}&period=abc`)).toBeNull();
+    expect(parseOtpAuthUri(`otpauth://totp/Site:eu?secret=${STRONG_SECRET}&digits=6.5`)).toBeNull();
+  });
+
   it('recusa endereço sem conta nem emissor', () => {
     expect(parseOtpAuthUri(`otpauth://totp/?secret=${STRONG_SECRET}`)).toBeNull();
   });
@@ -175,6 +232,8 @@ describe('buildOtpAuthUri', () => {
     });
     expect(uri).toContain(`secret=${STRONG_SECRET}`);
     expect(uri.indexOf(STRONG_SECRET)).toBeGreaterThan(uri.indexOf('?'));
+    // os parâmetros saem com o nome que a wiki usa, e nenhum a mais
+    expect(parametrosDe(uri)).toEqual(['secret', 'issuer', 'algorithm', 'digits', 'period']);
   });
 });
 
@@ -224,5 +283,8 @@ describe('cantos do rótulo e dos parâmetros', () => {
 
     expect(uri.startsWith('otpauth://totp/alice@github.com?')).toBe(true);
     expect(uri).not.toContain('issuer=');
+    // o nome do parâmetro importa tanto quanto a ausência dele: um `set` com o
+    // nome trocado sai como `=&GitHub`, que nenhum outro authenticator lê
+    expect(parametrosDe(uri)).toEqual(['secret', 'algorithm', 'digits', 'period']);
   });
 });

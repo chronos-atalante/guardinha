@@ -31,6 +31,7 @@ export const zhCN: Messages = {
     name: 'Guardinha',
     subtitle: 'Otaku Delirante',
     statusLocal: '100% 本地 / 已加密',
+    statusLabel: '状态:',
     nav: {
       home: '首页（密码）',
       generator: '密码生成器',
@@ -256,8 +257,7 @@ export const zhCN: Messages = {
   /** Diálogo de autodestruição sob coação e pelo botão de pânico. */
   panic: {
     title: '立即销毁密码库',
-    subtitle:
-      '这会抹掉**整个密码库**，无法恢复。密钥会从内存中清除，' + '加密文件会在消失之前被覆写。',
+    subtitle: '这会抹掉**整个密码库**，无法恢复。密钥会从内存中清除，加密文件会在消失之前被覆写。',
     manualTitle: '自毁',
     manualSubtitle:
       '如果你认为有人要抢走这台电脑，就用这个功能。' +
@@ -314,5 +314,13 @@ export const zhCN: Messages = {
     invalidAuthSecret: '设置密钥必须是有效的 Base32（A-Z 和 2-7），且至少包含 128 位（16 字节）。',
     authTokenNotFound: '未找到该 2FA 令牌。',
     internal: '密码库内部错误。',
+    /** Guarda de origem do IPC: o emissor não é a página oficial do app. */
+    foreignFrame: 'IPC 已阻止：请求并非来自应用页面。',
+    containerCorrupted: '密码库记录已损坏。',
+    invalidManifest: '完整性清单无效。',
+    invalidKdfParams: 'KDF 参数无效。',
+    unknownUnlockMethod: (kind: string): string => `未知的解锁方式：${kind}`,
+    truncatedDigest: 'HMAC 摘要被截断。',
+    shortPhrase: '恢复短语过短。',
   },
 };

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { currentMessages } from '@zero/main/i18n';
 import type { OtpAlgorithm } from '@zero/shared';
 
 /**
@@ -17,7 +18,7 @@ import type { OtpAlgorithm } from '@zero/shared';
 /** Lê um byte do digest sem espalhar `!` pelo código (o corte é sempre válido). */
 function byteAt(data: Buffer, index: number): number {
   const value = data[index];
-  if (value === undefined) throw new Error('digest HMAC truncado');
+  if (value === undefined) throw new Error(currentMessages().errors.truncatedDigest);
   return value;
 }
 

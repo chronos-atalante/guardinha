@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { protocol } from 'electron';
+import { currentMessages } from '@zero/main/i18n';
 
 /**
  * Scheme `guardinha://` e a guarda de origem do IPC.
@@ -67,6 +68,11 @@ function rendererMime(file: string): string {
  * Serve a SPA empacotada sob o scheme `guardinha://` (em vez de `file://`,
  * recomendado pela doc atual do Electron): todo `/assets/...` resolve dentro
  * de `out/renderer`, com path traversal rejeitado por `path.resolve` + prefix.
+ *
+ * Os corpos das respostas são frases de status do protocolo, em inglês e
+ * literais de propósito: é transporte, não interface. A tela é servida de
+ * `index.html` e quem chega aqui é o carregador de asset, não o usuário, então
+ * localizá-los seria um `settings.json` lido por requisição sem ganho nenhum.
  */
 export function registerAppProtocol(): void {
   const root = path.join(__dirname, '../renderer');
@@ -79,13 +85,13 @@ export function registerAppProtocol(): void {
         return new Response('Forbidden', { status: 403 });
       }
       if (!fs.existsSync(full) || fs.statSync(full).isDirectory()) {
-        return new Response('Não encontrado.', { status: 404 });
+        return new Response('Not Found', { status: 404 });
       }
       return new Response(new Uint8Array(fs.readFileSync(full)), {
         headers: { 'Content-Type': rendererMime(full) },
       });
     } catch {
-      return new Response('Erro', { status: 500 });
+      return new Response('Internal Error', { status: 500 });
     }
   });
 }
@@ -144,13 +150,29 @@ function isAppFrameUrl(url: string | undefined): boolean {
 }
 
 /**
+ * O pedaço do evento do IPC que a guarda precisa: o frame que o emitiu e a URL
+ * dele. Nomeado em vez de escrito na hora porque a forma aninhada e toda
+ * opcional (`senderFrame` pode não existir) é justamente o tipo de coisa que
+ * se esquece de conferir e vira `undefined` silencioso.
+ */
+interface FrameEmitter {
+  senderFrame?: { url?: unknown } | null;
+}
+
+/**
  * Recusa IPC cujo emissor não é a página oficial do app (scheme `guardinha://`
  * em produção ou dev server do Vite em dev). Requer `event.senderFrame`.
+ *
+ * A mensagem sai do bundle porque este erro **atravessa o IPC**: ele chega ao
+ * renderer como `Error` rejeitado, igual aos outros, e o usuário pode estar
+ * no idioma escolhido.
  */
 export function assertAppFrame(event: unknown): void {
-  const sf = (event as { senderFrame?: { url?: unknown } | null } | null | undefined)?.senderFrame;
-  const url = sf?.url;
+  if (typeof event !== 'object' || event === null) {
+    throw new Error(currentMessages().errors.foreignFrame);
+  }
+  const url = (event as FrameEmitter).senderFrame?.url;
   if (!isAppFrameUrl(typeof url === 'string' ? url : undefined)) {
-    throw new Error('IPC bloqueado: frame fora da página oficial do app.');
+    throw new Error(currentMessages().errors.foreignFrame);
   }
 }

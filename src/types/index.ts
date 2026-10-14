@@ -7,14 +7,18 @@ export type {
 } from '@zero/types/authenticator';
 export type { GeneratorOptions } from '@zero/types/generator';
 export type { AppSettings, Language } from '@zero/types/settings';
+export type { AuthMode, AuthStep, NavLabelKey, TabType } from '@zero/types/ui';
 export type {
   CreateVaultInput,
   Credential,
   CredentialInput,
   EraseResult,
+  FailedAttemptResult,
   PanicPinInput,
   PanicStatus,
+  PersistedAuthState,
   ResetPinInput,
+  TempCleanupResult,
   UnlockInput,
   UnlockKind,
   VaultResult,
