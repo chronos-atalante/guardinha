@@ -18,6 +18,7 @@ import { ensureVaultStructure } from '@zero/main/structure';
 import {
   initManifest,
   readVaultContainer,
+  writeAuthState,
   vaultExists,
   verifyManifest,
   writeVaultContainer,
@@ -294,5 +295,32 @@ describe('verifyManifest com o arquivo fora do esperado', () => {
     fs.rmSync(path.join(targetVaultDir(), '.entries', 'cccccccc-bbbb-4ccc-8ddd-eeeeeeeeeeee.zke'), {
       force: true,
     });
+  });
+
+  it('sela o manifesto na primeira vez em que initManifest roda', () => {
+    const chave = Buffer.alloc(32, 9);
+    const data = readVaultContainer();
+    expect(data).not.toBeNull();
+    if (data !== null) {
+      data.manifest = null;
+      writeVaultContainer(data);
+    }
+    expect(readVaultContainer()?.manifest).toBeNull();
+
+    initManifest(chave);
+
+    expect(readVaultContainer()?.manifest).not.toBeNull();
+  });
+
+  it('writeAuthState persiste a trava exponencial no container', () => {
+    const antes = readVaultContainer();
+    expect(antes).not.toBeNull();
+    writeAuthState({ attempts: 7, lockUntil: 123, attemptsMaster: 2, nukeLimit: 5 });
+
+    const depois = readVaultContainer();
+    expect(depois?.attempts).toBe(7);
+    expect(depois?.lockUntil).toBe(123);
+    expect(depois?.attemptsMaster).toBe(2);
+    expect(depois?.nukeLimit).toBe(5);
   });
 });

@@ -94,7 +94,7 @@ export function buildReport(results: MutantResult[]): ReportData {
         score: total === 0 ? 100 : Math.round((bucket.killed / total) * 1000) / 10,
       };
     })
-    .sort((a, b) => a.score - b.score || a.operator.localeCompare(b.operator));
+    .sort((a, b) => (a.score !== b.score ? a.score - b.score : a.operator.localeCompare(b.operator)));
 
   const byFile = [...fileMap]
     .map(([file, bucket]) => {
@@ -107,7 +107,7 @@ export function buildReport(results: MutantResult[]): ReportData {
         score: total === 0 ? 100 : Math.round((bucket.killed / total) * 1000) / 10,
       };
     })
-    .sort((a, b) => a.score - b.score || a.file.localeCompare(b.file));
+    .sort((a, b) => (a.score !== b.score ? a.score - b.score : a.file.localeCompare(b.file)));
 
   return {
     generatedAt: new Date().toISOString(),
@@ -123,7 +123,7 @@ export function buildReport(results: MutantResult[]): ReportData {
     byFile,
     survivors: results
       .filter((result) => result.status === 'survived')
-      .sort((a, b) => a.relFile.localeCompare(b.relFile) || a.line - b.line),
+      .sort((a, b) => (a.relFile !== b.relFile ? a.relFile.localeCompare(b.relFile) : a.line - b.line)),
   };
 }
 
@@ -247,7 +247,7 @@ export function writeReports(root = process.cwd()): ReportData {
   return report;
 }
 
-async function main(): Promise<void> {
+function main(): void {
   const root = process.cwd();
   const report = writeReports(root);
   process.stdout.write(
@@ -258,4 +258,4 @@ async function main(): Promise<void> {
 }
 
 const isMain = process.argv[1] !== undefined && import.meta.url === new URL(process.argv[1], 'file://').href;
-if (isMain) await main();
+if (isMain) main();

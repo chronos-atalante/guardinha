@@ -58,6 +58,7 @@ describe('trava exponencial', () => {
   it('escala 10s, 30s, 1m, 1h, 24h e trava no teto', () => {
     vi.useFakeTimers();
     vi.setSystemTime(BASE);
+    expect(calculateLockout(0)).toBe(BASE + 10_000);
     expect(calculateLockout(1)).toBe(BASE + 10_000);
     expect(calculateLockout(2)).toBe(BASE + 30_000);
     expect(calculateLockout(3)).toBe(BASE + 60_000);
