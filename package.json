@@ -37,7 +37,8 @@
     "test:mutation:plan": "node tools/mutation/run.ts --list",
     "dist": "npm run build && electron-builder --linux deb",
     "dist:dir": "npm run build && electron-builder --linux deb --dir",
-    "postinstall": "node node_modules/electron/install.js"
+    "postinstall": "node node_modules/electron/install.js",
+    "mutation:report": "node tools/mutation/report.ts"
   },
   "dependencies": {
     "fs-extra": "^11.3.0",

@@ -70,5 +70,6 @@ export function deleteAuth(id: string): void {
   assertSafeAuthId(id);
   ensureVaultStructure();
   const file = authFile(id);
-  if (fs.existsSync(file)) shredFile(file, SHRED_PASSES);
+  if (!fs.existsSync(file)) return;
+  shredFile(file, SHRED_PASSES);
 }

@@ -21,6 +21,7 @@ import {
 import { enumerateMutants, lineTextAt } from './mutants.ts';
 import { OPERATORS } from './operators.ts';
 import { isInScope } from './scope.ts';
+import { writeReports } from './report.ts';
 import type { CoverageMatrix } from './matrix.ts';
 import type { Mutant, MutantResult, MutantStatus } from './types.ts';
 
@@ -549,7 +550,7 @@ async function main(): Promise<void> {
   saveResults(results);
   const measured = plan.map((entry) => results.get(entry.mutant.id)).filter(isResult);
   const score = mutationScore(measured);
-  printSummary(measured, score, skippedCoverage, uncoveredFiles);
+  printSummary(measured, score);
 
   if (options.minScore !== null && score < options.minScore) {
     process.stdout.write(`\nscore ${score}% abaixo do mínimo de ${options.minScore}%\n`);
@@ -622,12 +623,7 @@ function printPlan(plan: PlannedMutant[], skippedCoverage: number, uncoveredFile
   );
 }
 
-function printSummary(
-  results: MutantResult[],
-  score: number,
-  skippedCoverage: number,
-  uncoveredFiles: string[],
-): void {
+function printSummary(results: MutantResult[], score: number): void {
   const byOperator = new Map<string, { killed: number; survived: number; other: number }>();
   const byFile = new Map<string, { killed: number; survived: number; other: number }>();
 
@@ -672,7 +668,7 @@ function printSummary(
     }
   }
 
-  writeMarkdown(results, score, skippedCoverage, uncoveredFiles);
+  writeReports(ROOT);
 }
 
 function rate(bucket: { killed: number; survived: number }): number {
@@ -680,38 +676,5 @@ function rate(bucket: { killed: number; survived: number }): number {
   return total === 0 ? 100 : (bucket.killed / total) * 100;
 }
 
-function writeMarkdown(
-  results: MutantResult[],
-  score: number,
-  skippedCoverage: number,
-  uncoveredFiles: string[],
-): void {
-  const survivors = results.filter((result) => result.status === 'survived');
-  const lines = [
-    '# Mutação',
-    '',
-    `Score: **${score.toFixed(1)}%**`,
-    '',
-    `- mutantes medidos: ${results.length}`,
-    `- sobreviventes: ${survivors.length}`,
-    `- fora do denominador (linha sem cobertura): ${skippedCoverage}`,
-    `- arquivos sem nenhum teste: ${uncoveredFiles.length}`,
-    '',
-  ];
-
-  if (survivors.length > 0) {
-    lines.push('## Sobreviventes', '', '| Arquivo | Linha | Operador | Troca | Código |');
-    lines.push('| --- | --- | --- | --- | --- |');
-    for (const result of survivors) {
-      lines.push(
-        `| \`${result.relFile}\` | ${result.line} | ${result.operator} | ` +
-          `\`${result.original}\` → \`${result.replacement}\` | \`${result.context}\` |`,
-      );
-    }
-    lines.push('');
-  }
-
-  writeFileSync(join(RESULT_DIR, 'report.md'), `${lines.join('\n')}\n`);
-}
 
 await main();

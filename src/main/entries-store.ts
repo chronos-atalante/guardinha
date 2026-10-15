@@ -83,7 +83,8 @@ export function writeEntryPayload(id: string, payload: SaltedPayload): void {
 export function deleteEntry(id: string): void {
   assertSafeEntryId(id);
   const file = entryFile(id);
-  if (fs.existsSync(file)) shredFile(file, SHRED_PASSES);
+  if (!fs.existsSync(file)) return;
+  shredFile(file, SHRED_PASSES);
 }
 
 /**
